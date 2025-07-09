@@ -61,5 +61,35 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          version: "0.4.20"
+
+
+      - name: Install package
+        run: uv pip install --system -e .[test]
+
+  test3:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: [ "3.9" ]
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          version: "0.4.20"
+
+
       - name: Install package
         run: uv pip install --system -e .[test]
