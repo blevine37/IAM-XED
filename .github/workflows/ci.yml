@@ -10,7 +10,6 @@ permissions:
 
 env:
   FORCE_COLOR: 1
-  PYTHONPATH: src
 
 jobs:
   test:
@@ -35,7 +34,7 @@ jobs:
 
     - name: Test script with `uv run`
       run: |
-        uv run src/iamxed/iamxed.py --help
+        uv run python -m src.iamxed.iamxed --help
 
     - name: Install package
       run: uv pip install --system -e .[test]
