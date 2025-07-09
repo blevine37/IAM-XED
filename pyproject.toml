@@ -17,7 +17,7 @@ description = "Independent Atom Model for X-ray and Electron Diffraction (XED) C
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
-    "numpy>=1.22",
+    "numpy>=1.21",
     "matplotlib>=3.4",
     "scipy>=1.7.0"
 ]
