@@ -20,32 +20,103 @@ def main():
     
     # Set up logger
     logger = output_logger(args.log_to_file, args.debug)
-    
+
+    # Print code header and copyright
+    logger.info('\n###################'\
+                '\n###  IAM-XED   ###'\
+                '\n###################\n')
+    logger.info("Independent Atom Model code for Ultrafast Electron and X-Ray Diffraction.\n"
+                "Copyright (c) 2025 Authors.\n")
+
     # Validate input arguments
     if not args.xrd and not args.ued:
-        logger.error("Must specify either --xrd or --ued")
+        logger.error("ERROR: No signal type specified. Use --xrd or --ued or both to specify the signal type.")
         return 1
     if args.xrd and args.ued:
-        logger.error("Cannot specify both --xrd and --ued")
+        logger.error("ERROR: Cannot specify both --xrd and --ued.")
         return 1
     if not args.signal_geoms:
-        logger.error("Must specify --signal-geoms")
+        logger.error("ERROR: No signal geometries provided. Use --signal-geoms to specify the geometry file or folder.")
         return 1
     if not hasattr(args, 'calculation_type') or args.calculation_type is None:
-        logger.error("Must specify --calculation-type (static, time-resolved, etc.)")
+        logger.error("ERROR: Must specify --calculation-type (static, time-resolved)")
         return 1
 
-    # Print basic info about mode and signal type
-    mode_msg = f"Mode: {args.calculation_type} | Signal: {'XRD' if args.xrd else 'UED'}"
-    logger.info(f"[IAM-XED] {mode_msg}")
-        
+    # Check if signal_geoms is a file or directory
+    import os
+    if not os.path.exists(args.signal_geoms):
+        logger.error(f"ERROR: Signal geometries path {args.signal_geoms} does not exist.")
+        return 1
+    else:
+        if os.path.isfile(args.signal_geoms):
+            signal_geom_type = 'file'
+        elif os.path.isdir(args.signal_geoms):
+            signal_geom_type = 'directory'
+        else:
+            logger.error('ERROR: Signal geometries path is neither a file nor a directory.')
+            return 1
+
+    if args.reference_geoms is None:
+        ref_calc = False
+    else:
+        if not os.path.exists(args.reference_geoms):
+            logger.error(f"ERROR: Reference geometries path {args.reference_geoms} does not exist.")
+            return 1
+        if not os.path.isfile(args.reference_geoms):
+            logger.error('ERROR: Reference geometries path is not a file, only single geometry file is supported for reference geometries.')
+            return 1
+        ref_calc = True
+
+    # Print input parameters
+    logger.info('INPUT PARAMETERS\n----------------')
+    for key, value in vars(args).items():
+        add = ''
+        if key == 'timestep':
+            add = 'a.t.u.'
+        elif key == 'signal_geoms':
+            add = f'({signal_geom_type})'
+        elif key in ['qmin', 'qmax']:
+            add = '1/Bohr'
+        logger.info(f"- {key:20s}: {value}  {add}")
+
+    # Print calculation intro
+    output = '\nCALCULATION\n-----------\n '
+    if args.calculation_type == 'static':
+        output += 'Static '
+    elif args.calculation_type == 'time-resolved':
+        output += 'Time-resolved '
+    if args.ued and args.xrd:
+        output += 'UED and XRD calculation will be performed.'
+    elif args.ued:
+        output += 'UED calculation will be performed.'
+    elif args.xrd:
+        output += 'XRD calculation will be performed.'
+    logger.info(output)
+
+    if args.xrd:
+        if args.inelastic:
+            logger.info(' Inelastic atomic contribution will be included in XRD calculation.')
+        else:
+            logger.info(' Inelastic atomic contribution will NOT be included in XRD calculation.')
+
+    if signal_geom_type == 'file':
+        logger.info(f' Signal geometries will be read from file ({args.signal_geoms}) - no ensemble calculation.')
+    elif signal_geom_type == 'directory':
+        logger.info(f' Signal geometries will be read from directory ({args.signal_geoms}) - ensemble calculation will be performed.')
+
+    if ref_calc:
+        logger.info(' Reference provided, difference calculation will be performed.')
+    else:
+        logger.info(' No reference provided, only signal calculation will be performed.')
+
     # Get unique elements from input geometries
     try:
         elements = get_elements_from_input(args.signal_geoms)
     except FileNotFoundError as e:
         logger.error(str(e))
         return 1
-        
+    logger.info(f"Elements found in input: {elements}")
+
     # Initialize appropriate calculator
     if args.xrd:
         calculator = XRDDiffractionCalculator(
@@ -62,65 +133,75 @@ def main():
             num_point=args.npoints,
             elements=elements
         )
-        
+    logger.info("Calculator initialized.")
+
     # Perform calculation based on type
     try:
         if args.reference_geoms:
-            # Always do difference calculation if reference is provided
-            # Compute reference signal (average if multi-geometry)
             if args.calculation_type == 'static':
+                logger.info('Performing static difference calculation...')
                 q, diff_signal, r, diff_pdf = calculator.calc_difference(args.signal_geoms, args.reference_geoms)
                 if args.plot_units == 'angstrom-1' and not args.xrd:
                     diff_signal = diff_signal / 0.529177
                 if args.plot:
+                    logger.info('Plotting static difference signal...')
                     plot_static(q, diff_signal, args.xrd, is_difference=True, plot_units=args.plot_units, r=r, pdf=diff_pdf)
                 if args.export:
+                    logger.info(f'Exporting static difference data to {args.export}...')
                     cmd_options = ' '.join(argv[1:])
                     header = f"# iamxed {cmd_options}"
                     np.savetxt(args.export, np.column_stack((q, diff_signal)), header=header, comments='')
             elif args.calculation_type == 'time-resolved':
+                logger.info('Performing time-resolved difference calculation...')
                 times, q, signal_raw, signal_smooth = calculator.calc_trajectory(
                     args.signal_geoms,
                     timestep_au=args.timestep,
                     fwhm_fs=args.fwhm
                 )
-                # Get reference signal for time-resolved
                 q_ref, ref_signal, _, _ = calculator.calc_single(args.reference_geoms)
-                # Subtract static reference from all time frames
                 diff_raw = (signal_raw - ref_signal[:, None]) / ref_signal[:, None] * 100
                 diff_smooth = (signal_smooth - ref_signal[:, None]) / ref_signal[:, None] * 100
                 if args.plot:
+                    logger.info('Plotting time-resolved difference signal...')
                     q_plot = q * 1.88973 if args.plot_units == 'angstrom-1' else q
                     plot_time_resolved(times, q_plot, diff_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
                     plot_time_resolved(times, q_plot, diff_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
                 if args.export:
+                    logger.info(f'Exporting time-resolved difference data to {args.export}...')
                     np.savez(args.export, times=times, q=q, signal_raw=diff_raw, signal_smooth=diff_smooth)
         else:
             if args.calculation_type == 'static':
+                logger.info('Performing static calculation...')
                 q, signal, r, pdf = calculator.calc_single(args.signal_geoms)
                 if args.plot_units == 'angstrom-1' and not args.xrd:
                     signal = signal / 0.529177
                 if args.plot:
+                    logger.info('Plotting static signal...')
                     plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf)
                 if args.export:
+                    logger.info(f'Exporting static data to {args.export}...')
                     cmd_options = ' '.join(argv[1:])
                     header = f"# xed.py {cmd_options}"
                     np.savetxt(args.export, np.column_stack((q, signal)), header=header, comments='')
             elif args.calculation_type == 'time-resolved':
+                logger.info('Performing time-resolved calculation...')
                 times, q, signal_raw, signal_smooth = calculator.calc_trajectory(
                     args.signal_geoms,
                     timestep_au=args.timestep,
                     fwhm_fs=args.fwhm
                 )
                 if args.plot:
+                    logger.info('Plotting time-resolved signal...')
                     q_plot = q * 1.88973 if args.plot_units == 'angstrom-1' else q
                     plot_time_resolved(times, q_plot, signal_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
                     plot_time_resolved(times, q_plot, signal_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
                 if args.export:
+                    logger.info(f'Exporting time-resolved data to {args.export}...')
                     np.savez(args.export, times=times, q=q, signal_raw=signal_raw, signal_smooth=signal_smooth)
     except Exception as e:
         logger.error(f"Error during calculation: {str(e)}")
         return 1
+    logger.info('Calculation complete.')
     return 0
 
 if __name__ == '__main__':

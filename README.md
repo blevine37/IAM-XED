@@ -29,6 +29,25 @@ iamxed --help
 ```bash
 iamxed --xrd --signal-geoms molecule.xyz
 ```
+Calculating the scattering signal in momentum coordinate q
+
+### Static difference XRD Calculation
+Calculating the scattering signal as a relative difference 
+```bash
+iamxed --xrd --signal-geoms molecule.xyz --reference-geoms molecule0.xyz
+```
+
+### Single Geometry UED Calculation
+```bash
+iamxed --ued --signal-geoms molecule.xyz
+```
+Calculating the scattering signal as a modified scattering intensity sM(s)=s*Imol/Iat
+
+### Static difference XRD Calculation
+```bash
+iamxed --ued --signal-geoms molecule.xyz --reference-geoms molecule0.xyz
+```
+Caclulating the difference signal as \Delta sM(s) = s*(\Delta Imol(s))/Iat(s)
 
 ### Time-Resolved UED Calculation
 ```bash
@@ -59,7 +78,6 @@ The package is located in the `src/iamxed` directory and contains the following 
 - Pytest
 
 ## License
-
 MIT License
 
 ## Authors
