@@ -102,29 +102,48 @@ class BaseDiffractionCalculator(ABC):
 
     @staticmethod
     def FT(s: np.ndarray, T: np.ndarray, alpha: float) -> np.ndarray:
-        """Fourier transform for PDF calculation."""
+        """Fourier transform for PDF calculation.
+        
+        Args:
+            s: Q-grid in Angstrom^-1
+            T: Signal to transform
+            alpha: Damping parameter in Angstrom^2
+            
+        Returns:
+            PDF on same grid as input
+        """
         T = np.nan_to_num(T)
         Tr = np.empty_like(T)
         for pos, k in enumerate(s):
-            Tr[pos] = k * np.trapz(T * np.sin(s * k) * np.exp(-alpha * s ** 2), x=s)
+            Tr[pos] = k * np.trapz(T * np.sin(s * k) * np.exp(-alpha * s**2), x=s)
         return Tr
 
 class XRDDiffractionCalculator(BaseDiffractionCalculator):
-    """XRD-specific calculator implementation."""
+    """Calculate XRD patterns using IAM approximation."""
     
     def __init__(self, q_start: float, q_end: float, num_point: int, elements: List[str], 
                  inelastic: bool = False, xsf_dir: str = 'XSF'):
+        """Initialize XRD calculator.
+        
+        Args:
+            q_start: Starting q value in atomic units
+            q_end: Ending q value in atomic units
+            num_point: Number of q points
+            elements: List of elements to load form factors for
+            inelastic: Whether to include inelastic scattering
+            xsf_dir: Directory containing XSF files for form factors
+        """
         super().__init__(q_start, q_end, num_point, elements)
         self.inelastic = inelastic
         self.xsf_dir = xsf_dir
-        self.Szaloki = None
+        self.Szaloki_params = {}
         if inelastic:
             self.load_Szaloki_params()
             
     def load_Szaloki_params(self):
-        """Load Szaloki parameters for inelastic calculations."""
+        """Load Szaloki parameters for inelastic scattering."""
         xsf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.xsf_dir)
-        self.Szaloki = np.loadtxt(os.path.join(xsf_path, 'Szaloki_params_more.csv'), delimiter=',')
+        self.Szaloki_params = np.loadtxt(os.path.join(xsf_path, 'Szaloki_params_more.csv'), delimiter=',')
         
     def load_form_factors(self):
         """Load XRD form factors."""
@@ -139,7 +158,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             f = interp1d(data[:, 0], data[:, 1], kind='cubic', bounds_error=False, fill_value=0)
             self.form_factors[el] = f(self.qfit)  # XRD form factors are real
             
-    def calc_single(self, geom_file: str) -> Tuple[np.ndarray, np.ndarray, None, None]:
+    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry XRD pattern, or average over all geometries in a directory or trajectory file."""
         import os
         if os.path.isdir(geom_file):
@@ -179,12 +198,12 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             return self.qfit, Itot, None, None
         
     def calc_atomic_intensity(self, atoms: List[str]) -> np.ndarray:
-        """Calculate atomic intensity including inelastic if enabled."""
+        """Calculate atomic intensity for XRD."""
         Iat = np.zeros_like(self.qfit)
         for atom in atoms:
             ff = self.form_factors[atom]
             Iat += ff ** 2
-            if self.inelastic and self.Szaloki is not None:
+            if self.inelastic and self.Szaloki_params is not None:
                 # Add inelastic contribution
                 atn = self.get_atomic_number(atom)
                 inel = self.calc_inelastic(atn)
@@ -192,15 +211,15 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         return Iat
         
     def get_atomic_number(self, element: str) -> int:
-        """Get atomic number for an element."""
+        """Get atomic number for element."""
         periodic = {'H': 1, 'C': 6, 'O': 8, 'F': 9, 'S': 16}
         return periodic[element]
         
     def calc_inelastic(self, atomic_number: int) -> np.ndarray:
-        """Calculate inelastic contribution for an atom."""
-        if self.Szaloki is None:
+        """Calculate inelastic scattering for given atomic number."""
+        if self.Szaloki_params is None:
             return np.zeros_like(self.qfit)
-        params = self.Szaloki[atomic_number-1, :]
+        params = self.Szaloki_params[atomic_number-1, :]
         Z, d1, d2, d3, q1, t1, t2, t3, *_ = params
         return self._calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, self.qfit * ANG_TO_BH / (4 * np.pi))
         
@@ -229,7 +248,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         g2 = 1 - np.exp(t3 * (q1 - q))
         return (Z - s1q1 - t2) * g1 + t2 * g2 + s1q1
 
-    def calc_difference(self, geom1: str, geom2: str) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate difference between two geometries.
         
         For XRD, returns relative difference (I1-I2)/I2 * 100 as percentage.
@@ -259,34 +278,46 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         diff = (I1 - I2) / I2 * 100
         return self.qfit, diff, None, None
 
-    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate time-resolved XRD pattern from trajectory, returning both unsmoothed and smoothed signals.
+        For XRD, PDFs are not calculated, so dummy arrays are returned for compatibility with UED.
         
-        Returns relative differences (I(t)-I(0))/I(0) * 100 as percentage.
+        Args:
+            trajfile: Path to trajectory file
+            timestep_au: Time step in atomic units
+            fwhm_fs: FWHM of Gaussian smoothing in fs
+            pdf_alpha: Damping parameter for PDF calculation (unused in XRD)
+        
+        Returns:
+            times: Time points in fs
+            q: Q-grid in atomic units
+            signal_raw: Raw signal (not smoothed)
+            signal_smooth: Gaussian smoothed signal
+            r: R-grid for PDF (dummy for XRD)
+            pdfs_raw: Raw PDFs (dummy for XRD)
+            pdfs_smooth: Gaussian smoothed PDFs (dummy for XRD)
         """
         atoms, trajectory = read_xyz_trajectory(trajfile)
         if not self.form_factors:
             self.load_form_factors()
-            
-        # Calculate reference (t=0) intensities
-        Iat0 = self.calc_atomic_intensity(atoms)  # This includes inelastic if enabled
-        Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
-        I0 = Iat0 + Imol0
-        
-        # Calculate relative signals for each frame
+        Iat = self.calc_atomic_intensity(atoms)
+        sm0 = self.qfit * (self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0]) / Iat)
         signals = []
         for coords in trajectory:
-            Iat = self.calc_atomic_intensity(atoms)  # This includes inelastic if enabled
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            I = Iat + Imol
-            rel = (I - I0) / I0 * 100  # Relative difference in percent
-            signals.append(rel)
-            
+            sm = self.qfit * (Imol / Iat)
+            signals.append(sm - sm0)
         signal_raw = np.array(signals).T
         dt_fs = timestep_au / 40 * 0.9675537016
         times = np.arange(signal_raw.shape[1]) * dt_fs
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
-        return times_smooth, self.qfit, signal_raw, signal_smooth
+        
+        # Return dummy PDF arrays for compatibility with UED
+        r = np.array([0.0])  # Dummy r grid
+        pdfs_raw = np.zeros((1, signal_raw.shape[1]))  # Dummy raw PDFs
+        pdfs_smooth = np.zeros((1, signal_smooth.shape[1]))  # Dummy smoothed PDFs
+        
+        return times_smooth, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth
 
     def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Calculate ensemble average of trajectories.
@@ -384,7 +415,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             yim = fim(thetafit)
             self.form_factors[el] = yre + 1j * yim  # UED form factors are complex
             
-    def calc_single(self, geom_file: str) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry UED pattern and PDF, or average over all geometries in a directory or trajectory file."""
         import os
         from .io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
@@ -404,13 +435,12 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
                 sm_real = np.real(sm)
                 q_ang = self.qfit / 0.529177
                 sm_ang = sm_real / 0.529177
-                r = q_ang.copy()
-                pdf = self.FT(q_ang, sm_ang, 0.04)
+                r = q_ang.copy()  # Use same grid for r as q
+                pdf = self.FT(q_ang, sm_ang, pdf_alpha)
                 signals.append(sm_real)
                 pdfs.append(pdf)
             avg_signal = np.mean(signals, axis=0)
             avg_pdf = np.mean(pdfs, axis=0)
-            r = q_ang.copy()
             return self.qfit, avg_signal, r, avg_pdf
         elif is_trajectory_file(geom_file):
             atoms, trajectory = read_xyz_trajectory(geom_file)
@@ -425,13 +455,12 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
                 sm_real = np.real(sm)
                 q_ang = self.qfit / 0.529177
                 sm_ang = sm_real / 0.529177
-                r = q_ang.copy()
-                pdf = self.FT(q_ang, sm_ang, 0.04)
+                r = q_ang.copy()  # Use same grid for r as q
+                pdf = self.FT(q_ang, sm_ang, pdf_alpha)
                 signals.append(sm_real)
                 pdfs.append(pdf)
             avg_signal = np.mean(signals, axis=0)
             avg_pdf = np.mean(pdfs, axis=0)
-            r = q_ang.copy()
             return self.qfit, avg_signal, r, avg_pdf
         else:
             atoms, coords = read_xyz(geom_file)
@@ -443,8 +472,8 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             sm_real = np.real(sm)
             q_ang = self.qfit / 0.529177
             sm_ang = sm_real / 0.529177
-            r = q_ang.copy()
-            pdf = self.FT(q_ang, sm_ang, 0.04)
+            r = q_ang.copy()  # Use same grid for r as q
+            pdf = self.FT(q_ang, sm_ang, pdf_alpha)
             return self.qfit, sm_real, r, pdf
 
     def calc_atomic_intensity(self, atoms: List[str]) -> np.ndarray:
@@ -455,7 +484,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             Iat += ff * np.conjugate(ff)  # Multiply by conjugate to get real intensity
         return np.real(Iat)  # Return real part since intensity must be real
 
-    def calc_difference(self, geom1: str, geom2: str) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate difference between two geometries and its PDF.
         Atom order does not need to match, only the sets of elements must be the same.
         """
@@ -487,13 +516,28 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         # Calculate PDF from difference signal
         q_ang = self.qfit / 0.529177
         sm_diff_ang = sm_diff / 0.529177
-        r = np.linspace(0, 10, 500)  # r grid in angstroms
-        pdf = self.FT(q_ang, sm_diff_ang, 0.04)
-        
+        r = q_ang.copy()  # Use same grid for r as q
+        pdf = self.FT(q_ang, sm_diff_ang, pdf_alpha)
         return self.qfit, sm_diff, r, pdf
 
-    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Calculate time-resolved UED pattern from trajectory, returning both unsmoothed and smoothed signals."""
+    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Calculate time-resolved UED pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.
+        
+        Args:
+            trajfile: Path to trajectory file
+            timestep_au: Time step in atomic units
+            fwhm_fs: FWHM of Gaussian smoothing in fs
+            pdf_alpha: Damping parameter for PDF calculation
+        
+        Returns:
+            times: Time points in fs
+            q: Q-grid in atomic units
+            signal_raw: Raw signal (not smoothed)
+            signal_smooth: Gaussian smoothed signal
+            r: R-grid for PDF in Angstroms
+            pdfs_raw: Raw PDFs (not smoothed)
+            pdfs_smooth: Gaussian smoothed PDFs
+        """
         atoms, trajectory = read_xyz_trajectory(trajfile)
         if not self.form_factors:
             self.load_form_factors()
@@ -501,16 +545,37 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         sm0 = self.qfit * (self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0]) / Iat)
         sm0 = np.real(sm0)
         signals = []
+        pdfs = []
+        
+        # Calculate q grid in Angstroms for PDF
+        q_ang = self.qfit / 0.529177
+        r = q_ang.copy()
+        
         for coords in trajectory:
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
             sm = self.qfit * (Imol / Iat)
             sm = np.real(sm)
-            signals.append(sm - sm0)
+            rel = sm - sm0
+            
+            # Calculate PDF for this frame using provided alpha
+            sm_ang = rel / 0.529177  # Convert to Angstrom^-1 for PDF calculation
+            pdf = self.FT(q_ang, sm_ang, pdf_alpha)
+            
+            signals.append(rel)
+            pdfs.append(pdf)
+            
         signal_raw = np.array(signals).T
+        pdfs_raw = np.array(pdfs).T      # Shape: [r_points, time_points]
+        
+        # Calculate time axis for original data (no padding)
         dt_fs = timestep_au / 40 * 0.9675537016
         times = np.arange(signal_raw.shape[1]) * dt_fs
+        
+        # Smooth signals and PDFs separately
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
-        return times, self.qfit, signal_raw, signal_smooth
+        pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
+        
+        return times, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth
 
     def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Calculate ensemble average of trajectories."""

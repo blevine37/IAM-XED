@@ -94,7 +94,11 @@ def plot_time_resolved(times: np.ndarray, q: np.ndarray, signal: np.ndarray, is_
     vlim = np.nanmax(np.abs(signal_plot))
     divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
     plt.figure(figsize=(10, 6))
-    extent = (times.min(), times.max(), q_plot.min(), q_plot.max())
+    
+    # For smoothed data, we want to show the full time range including negative times
+    # For raw data, we start at t=0
+    t_min = times.min() if smoothed else 0
+    extent = (t_min, times.max(), q_plot.min(), q_plot.max())
     im = plt.imshow(signal_plot, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
     plt.colorbar(im, label=f'ΔI/I₀ (%)' if is_xrd else f'ΔsM(q) {sm_unit}')
     plt.xlabel('Time (fs)')
@@ -104,4 +108,35 @@ def plot_time_resolved(times: np.ndarray, q: np.ndarray, signal: np.ndarray, is_
     else:
         plt.title(f'Time-Resolved {"XRD" if is_xrd else "UED"} Pattern (Unsmoothed)')
     plt.tight_layout()
+    plt.show()
+
+def plot_time_resolved_pdf(times: np.ndarray, r: np.ndarray, pdfs: np.ndarray, smoothed: bool = False, fwhm_fs: float = 150.0) -> None:
+    """Plot time-resolved PDF data.
+    
+    Args:
+        times: Time points in fs
+        r: R-grid in Angstroms
+        pdfs: PDF data array (shape: [r_points, time_points])
+        smoothed: Whether this is smoothed data (affects plot title)
+        fwhm_fs: FWHM of Gaussian smoothing in fs (for plot title)
+    """
+    plt.figure(figsize=(10, 6))
+    # Use diverging normalization centered at zero for better visualization
+    vlim = np.nanmax(np.abs(pdfs))
+    divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
+    
+    # For smoothed data, we want to show the full time range including negative times
+    # For raw data, we start at t=0
+    t_min = times.min() if smoothed else 0
+    extent = (t_min, times.max(), r.min(), r.max())
+    im = plt.imshow(pdfs, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
+    plt.colorbar(im, label='ΔP(r) (arb. units)')
+    plt.xlabel('Time (fs)')
+    plt.ylabel('r (Å)')
+    title = 'Time-Resolved PDF'
+    if smoothed:
+        title += f' (Smoothed, FWHM = {fwhm_fs:.0f} fs)'
+    plt.title(title)
+    plt.tight_layout()
+    plt.savefig(f'time_resolved_pdf{"_smoothed" if smoothed else ""}.png', dpi=300)
     plt.show() 

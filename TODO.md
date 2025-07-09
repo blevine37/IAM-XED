@@ -8,7 +8,7 @@
   - [x] xrd difference between two geometries
   - [x] ued difference between two geometries
   - [ ] xrd time-resolved signal from trajectory
-  - [ ] ued time-resolved signal from trajectory
+  - [x] ued time-resolved signal from trajectory
   - [ ] xrd time-resolved signal from ensemble
   - [ ] ued time-resolved signal from ensemble
 - [ ] Form factor db restructuralize

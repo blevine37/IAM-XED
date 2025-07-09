@@ -7,7 +7,7 @@ import numpy as np
 
 from .io_utils import parse_cmd_args, output_logger, get_elements_from_input
 from .physics import XRDDiffractionCalculator, UEDDiffractionCalculator
-from .plotting import plot_static, plot_time_resolved
+from .plotting import plot_static, plot_time_resolved, plot_time_resolved_pdf
 
 def main():
     global logger
@@ -151,21 +151,30 @@ def main():
                     np.savetxt(args.export, np.column_stack((q, diff_signal)), header=header, comments='')
             elif args.calculation_type == 'time-resolved':
                 logger.info('Performing time-resolved difference calculation...')
-                times, q, signal_raw, signal_smooth = calculator.calc_trajectory(
+                times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_trajectory(
                     args.signal_geoms,
                     timestep_au=args.timestep,
-                    fwhm_fs=args.fwhm
+                    fwhm_fs=args.fwhm,
+                    pdf_alpha=args.pdf_alpha
                 )
-                q_ref, ref_signal, _, _ = calculator.calc_single(args.reference_geoms)
+                q_ref, ref_signal, r_ref, ref_pdf = calculator.calc_single(args.reference_geoms)
                 diff_raw = (signal_raw - ref_signal[:, None]) / ref_signal[:, None] * 100
                 diff_smooth = (signal_smooth - ref_signal[:, None]) / ref_signal[:, None] * 100
                 if args.plot:
                     logger.info('Plotting time-resolved difference signal...')
                     plot_time_resolved(times, q, diff_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
                     plot_time_resolved(times, q, diff_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
+                    if not args.xrd and r_ref is not None and ref_pdf is not None:  # Plot PDFs for UED only
+                        logger.info('Plotting time-resolved PDFs...')
+                        plot_time_resolved_pdf(times, r, pdfs_raw, smoothed=False, fwhm_fs=args.fwhm)
+                        plot_time_resolved_pdf(times, r, pdfs_smooth, smoothed=True, fwhm_fs=args.fwhm)
                 if args.export:
                     logger.info(f'Exporting time-resolved difference data to {args.export}...')
-                    np.savez(args.export, times=times, q=q, signal_raw=diff_raw, signal_smooth=diff_smooth)
+                    if not args.xrd:  # Include PDFs for UED only
+                        np.savez(args.export, times=times, q=q, signal_raw=diff_raw, signal_smooth=diff_smooth,
+                               r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth)
+                    else:
+                        np.savez(args.export, times=times, q=q, signal_raw=diff_raw, signal_smooth=diff_smooth)
         else:
             if args.calculation_type == 'static':
                 logger.info('Performing static calculation...')
@@ -180,18 +189,32 @@ def main():
                     np.savetxt(args.export, np.column_stack((q, signal)), header=header, comments='')
             elif args.calculation_type == 'time-resolved':
                 logger.info('Performing time-resolved calculation...')
-                times, q, signal_raw, signal_smooth = calculator.calc_trajectory(
+                # Both XRD and UED calculators now return the same number of values
+                times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_trajectory(
                     args.signal_geoms,
                     timestep_au=args.timestep,
-                    fwhm_fs=args.fwhm
+                    fwhm_fs=args.fwhm,
+                    pdf_alpha=args.pdf_alpha
                 )
+                
+                # Get smoothed time axis for smoothed data
+                _, times_smooth = calculator.gaussian_smooth_2d_time(signal_raw, times, args.fwhm)
+                
                 if args.plot:
                     logger.info('Plotting time-resolved signal...')
                     plot_time_resolved(times, q, signal_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
-                    plot_time_resolved(times, q, signal_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
+                    plot_time_resolved(times_smooth, q, signal_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
+                    if not args.xrd:  # Plot PDFs for UED only
+                        logger.info('Plotting time-resolved PDFs...')
+                        plot_time_resolved_pdf(times, r, pdfs_raw, smoothed=False, fwhm_fs=args.fwhm)
+                        plot_time_resolved_pdf(times_smooth, r, pdfs_smooth, smoothed=True, fwhm_fs=args.fwhm)
                 if args.export:
                     logger.info(f'Exporting time-resolved data to {args.export}...')
-                    np.savez(args.export, times=times, q=q, signal_raw=signal_raw, signal_smooth=signal_smooth)
+                    if not args.xrd:  # Include PDFs for UED only
+                        np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw, signal_smooth=signal_smooth,
+                               r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth)
+                    else:
+                        np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw, signal_smooth=signal_smooth)
     except Exception as e:
         logger.error(f"Error during calculation: {str(e)}")
         return 1

@@ -179,7 +179,7 @@ def parse_cmd_args(args: Optional[List[str]] = None):
     proc_sec.add_argument('--fwhm', type=float, default=150.0,
                          help='FWHM for temporal Gaussian smoothing (fs)')
     proc_sec.add_argument('--pdf-alpha', type=float, default=0.04,
-                         help='Damping parameter for PDF Fourier transform')
+                         help='Damping parameter for PDF Fourier transform (Ang^2)')
     
     # Output options
     out_sec = parser.add_argument_group("Output options")

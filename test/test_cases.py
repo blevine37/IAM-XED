@@ -19,7 +19,7 @@ test_cases = [
     },
     {
         "dir": "test/CF3I",
-        "command": "--ued --calculation-type static --signal-geoms CF3I.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --plot-units angstrom-1 --export ued.out",
+        "command": "--ued --calculation-type static --signal-geoms CF3I.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --plot-units angstrom-1 --export ued.out", #currently exporting in atomic units
         "output": "ued.out",
         "reference": "reference_ued.out"
     },
@@ -34,7 +34,13 @@ test_cases = [
         "command": "--xrd --calculation-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export xrd_diff.out", 
 	    "output": "xrd_diff.out",
         "reference": "reference_xrd_diff.out"
-    }
+    },
+    {
+        "dir": "test/cyclobutanone",
+        "command": "--ued  --signal-geoms cycbut_traj.xyz  --calculation-type time-resolved --qmin 0.0 --qmax 5.29 --npoints 53 --pdf-alpha 0.02 --timestep 40 --export ued_traj", 
+	    "output": "ued_traj.npz",
+        "reference": "reference_ued_traj.npz"
+    },
 ]
 
 test_ids = [
@@ -43,5 +49,6 @@ test_ids = [
     "H2-ued-static",
     "CF3-ued-static",            #10.1146/annurev-physchem-082720-010539
     "CYCBUT-ued-c2-min-diff-static",
-    "CYCBUT-xrd-c3-min-diff-static"  
+    "CYCBUT-xrd-c3-min-diff-static",
+    "CYCBUT-ued-traj" 
 ] 
