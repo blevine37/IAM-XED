@@ -19,8 +19,6 @@ def get_test_cases():
 def main():
     """Generate reference files for all test cases."""
     test_cases = get_test_cases()
-    # Assuming we're running from within the test directory
-    xed_path = (Path(__file__).parent.parent / "xed.py").resolve()
 
     for test in test_cases:
         # Remove "test/" prefix if running from test directory
@@ -44,7 +42,7 @@ def main():
         os.chdir(test_dir)
 
         try:
-            cmd = f"python {xed_path} {test['command']}"
+            cmd = f"iamxed {test['command']}"
             print(f"Running: {cmd}")
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
 

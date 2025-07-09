@@ -141,8 +141,6 @@ def main():
             if args.calculation_type == 'static':
                 logger.info('Performing static difference calculation...')
                 q, diff_signal, r, diff_pdf = calculator.calc_difference(args.signal_geoms, args.reference_geoms)
-                if args.plot_units == 'angstrom-1' and not args.xrd:
-                    diff_signal = diff_signal / 0.529177
                 if args.plot:
                     logger.info('Plotting static difference signal...')
                     plot_static(q, diff_signal, args.xrd, is_difference=True, plot_units=args.plot_units, r=r, pdf=diff_pdf)
@@ -163,9 +161,8 @@ def main():
                 diff_smooth = (signal_smooth - ref_signal[:, None]) / ref_signal[:, None] * 100
                 if args.plot:
                     logger.info('Plotting time-resolved difference signal...')
-                    q_plot = q * 1.88973 if args.plot_units == 'angstrom-1' else q
-                    plot_time_resolved(times, q_plot, diff_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
-                    plot_time_resolved(times, q_plot, diff_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
+                    plot_time_resolved(times, q, diff_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
+                    plot_time_resolved(times, q, diff_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
                 if args.export:
                     logger.info(f'Exporting time-resolved difference data to {args.export}...')
                     np.savez(args.export, times=times, q=q, signal_raw=diff_raw, signal_smooth=diff_smooth)
@@ -173,8 +170,6 @@ def main():
             if args.calculation_type == 'static':
                 logger.info('Performing static calculation...')
                 q, signal, r, pdf = calculator.calc_single(args.signal_geoms)
-                if args.plot_units == 'angstrom-1' and not args.xrd:
-                    signal = signal / 0.529177
                 if args.plot:
                     logger.info('Plotting static signal...')
                     plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf)
@@ -192,9 +187,8 @@ def main():
                 )
                 if args.plot:
                     logger.info('Plotting time-resolved signal...')
-                    q_plot = q * 1.88973 if args.plot_units == 'angstrom-1' else q
-                    plot_time_resolved(times, q_plot, signal_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
-                    plot_time_resolved(times, q_plot, signal_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
+                    plot_time_resolved(times, q, signal_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
+                    plot_time_resolved(times, q, signal_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
                 if args.export:
                     logger.info(f'Exporting time-resolved data to {args.export}...')
                     np.savez(args.export, times=times, q=q, signal_raw=signal_raw, signal_smooth=signal_smooth)

@@ -1,4 +1,4 @@
-# xed.py --ued --calculation-type static --signal-geoms c2.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export ued_diff.out
+# iamxed --ued --calculation-type static --signal-geoms c2.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export ued_diff.out
 0.000000000000000000e+00 0.000000000000000000e+00
 1.001669449081802991e-02 -3.971964408779895400e-02
 2.003338898163605983e-02 -7.477683404615753648e-02

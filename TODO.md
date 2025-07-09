@@ -19,3 +19,4 @@
 - [ ] Better plotting
 - [ ] Write tests
 - [ ] Handling oscillatory sinc behavior for diff at long distances
+- [ ] Exporting data in other then atomic units

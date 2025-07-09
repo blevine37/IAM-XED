@@ -1,4 +1,4 @@
-# xed.py --xrd --calculation-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export xrd_diff.out
+# iamxed --xrd --calculation-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export xrd_diff.out
 0.000000000000000000e+00 0.000000000000000000e+00
 1.001669449081802991e-02 -2.320510622327942585e+01
 2.003338898163605983e-02 -5.389413325112252551e+01

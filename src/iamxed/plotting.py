@@ -11,21 +11,26 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
     
     Args:
         q: Q-values in atomic units
-        signal: Diffraction signal
+        signal: Diffraction signal (in Bohr^-1 for UED)
         is_xrd: True if XRD, False if UED
         is_difference: True if plotting difference signal
         plot_units: 'bohr-1' or 'angstrom-1'
         r: r grid for PDF (optional)
         pdf: PDF values (optional)
     """
+    # Convert units if needed
     if plot_units == 'angstrom-1':
         q_plot = q * 1.88973
+        # Convert signal to Angstrom^-1 for UED
+        signal_plot = signal / 0.529177 if not is_xrd else signal
         x_label = 'q (Å⁻¹)'
     else:
         q_plot = q
+        signal_plot = signal
         x_label = 'q (Bohr⁻¹)'
+    
     plt.figure(figsize=(10, 6))
-    plt.plot(q_plot, signal, 'k-', linewidth=1.5)
+    plt.plot(q_plot, signal_plot, 'k-', linewidth=1.5)
     plt.xlabel(x_label)
     if is_xrd:
         if is_difference:
@@ -61,20 +66,37 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
         plt.show()
 
 def plot_time_resolved(times: np.ndarray, q: np.ndarray, signal: np.ndarray, is_xrd: bool, plot_units: str = 'bohr-1', smoothed: bool = False, fwhm_fs: float = 150.0) -> None:
-    """Plot time-resolved diffraction pattern (unsmoothed or smoothed)."""
+    """Plot time-resolved diffraction pattern (unsmoothed or smoothed).
+    
+    Args:
+        times: Time points in fs
+        q: Q-values in atomic units
+        signal: Diffraction signal (in Bohr^-1 for UED)
+        is_xrd: True if XRD, False if UED
+        plot_units: 'bohr-1' or 'angstrom-1'
+        smoothed: Whether this is smoothed data
+        fwhm_fs: FWHM in fs for smoothed data
+    """
+    # Convert units if needed
     if plot_units == 'angstrom-1':
         q_plot = q * 1.88973
+        # Convert signal to Angstrom^-1 for UED
+        signal_plot = signal / 0.529177 if not is_xrd else signal
         y_label = 'q (Å⁻¹)'
+        sm_unit = '(Å⁻¹)' if not is_xrd else ''
     else:
         q_plot = q
+        signal_plot = signal
         y_label = 'q (Bohr⁻¹)'
+        sm_unit = '(Bohr⁻¹)' if not is_xrd else ''
+    
     # Diverging normalization centered at zero
-    vlim = np.nanmax(np.abs(signal))
+    vlim = np.nanmax(np.abs(signal_plot))
     divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
     plt.figure(figsize=(10, 6))
     extent = (times.min(), times.max(), q_plot.min(), q_plot.max())
-    im = plt.imshow(signal, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
-    plt.colorbar(im, label='ΔI/I₀ (%)' if is_xrd else 'ΔsM(q)')
+    im = plt.imshow(signal_plot, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
+    plt.colorbar(im, label=f'ΔI/I₀ (%)' if is_xrd else f'ΔsM(q) {sm_unit}')
     plt.xlabel('Time (fs)')
     plt.ylabel(y_label)
     if smoothed:
