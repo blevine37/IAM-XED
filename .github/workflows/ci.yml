@@ -35,6 +35,8 @@ jobs:
     - name: Test script with `uv run`
       run: |
         uv run python -m src.iamxed.iamxed --help
+        uv run python -m src.iamxed.iamxed --ued --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out
+        uv run python -m src.iamxed.iamxed --xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out
 
     - name: Install package
       run: uv pip install --system -e .[test]
@@ -65,9 +67,6 @@ jobs:
         uses: astral-sh/setup-uv@v1
         with:
           version: "0.4.20"
-
-      - name: Test script with `uv run` v1
-        run: uv run python iamxed --help
 
       - name: Test script with `uv run` v2
         run: uv run iamxed --help
