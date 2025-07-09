@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.7", "3.11"]
+        python: ["3.9"]
 
     runs-on: ubuntu-22.04
 
@@ -45,3 +45,21 @@ jobs:
     - name: Run smoke tests from installed package
       run: |
         iamxed --help
+
+  test2:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: [ "3.9" ]
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install package
+        run: uv pip install --system -e .[test]
