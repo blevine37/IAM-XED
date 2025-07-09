@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: [ "3.9", "3.10", "3.11", "3.12" ]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v1
+      with:
+          version: "0.4.20"
+
+    - name: Test running iamxed.py with `uv run`
+      run: uv run python -m src.iamxed.iamxed --help
+
+    - name: Test running iamxed as script with `uv run`
+      run: uv run iamxed --help
+
+    - name: Test iamxed with `uv run` using ued and xrd flags
+      run: |
+        uv run iamxed --ued --calculation-type static --signal-geoms test/H2/h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out
+        uv run iamxed --xrd --calculation-type static --signal-geoms test/H2/h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out
+
+    - name: Install IAM-XED package
+      run: uv pip install --system -e .[test]
+
+    - name: Run unit tests
+      run: pytest -v
+
+    - name: Run smoke tests from installed package
+      run: iamxed --help
