@@ -8,12 +8,11 @@ from test_cases import test_cases, test_ids
 
 def run_command(test_dir, command):
     """Run XED command in the specified test directory."""
-    xed_path = Path(__file__).parent.parent / "xed.py"
     original_dir = os.getcwd()
     os.chdir(test_dir)
 
     try:
-        cmd = f"python3 {xed_path} {command}"
+        cmd = f"iamxed {command}"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result
     finally:

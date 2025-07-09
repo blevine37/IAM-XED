@@ -1,20 +1,38 @@
 # IAM-XED
-# Independent Atom Model - X-ray and Electron Diffraction (XED) Calculator
+# Independent Atom Model - X-ray and Electron Diffraction code
 
-A Python package for calculating X-ray diffraction (XRD) and ultrafast electron diffraction (UED) patterns from molecular geometries and trajectories.
+A Python package for calculating X-ray diffraction (XRD) and ultrafast electron diffraction (UED) patterns from molecular geometries and trajectories based on the Independent Atom Model (IAM).
 
 ## Installation
+The package can be installed from the source code. Clone the repository and run the following command in the root directory:
+```bash
+git clone git@github.com:blevine37/IAM-XED.git
+cd IAM-XED
+pip install -e .
+```
+Flag `-e` installs the package in editable mode, allowing you to modify the source code without reinstalling. 
+For common users, we recommend not using this flag.
+
+## Testing
+Run the tests to ensure everything is working correctly. Make sure you have pytest installed, then run in the root directory:
+```bash
+pytest -v
+```
 
 ## Usage
+Once the package is installed, you can use iamxed as a script
+```bash
+iamxed --help
+```
 
 ### Single Geometry XRD Calculation
 ```bash
-python xed.py --xrd --signal-geoms molecule.xyz
+iamxed --xrd --signal-geoms molecule.xyz
 ```
 
 ### Time-Resolved UED Calculation
 ```bash
-python xed.py --ued --signal-geoms trajectory.xyz --calculation-type time-resolved
+iamxed --ued --signal-geoms trajectory.xyz --calculation-type time-resolved
 ```
 
 ### Additional Options
@@ -26,7 +44,7 @@ python xed.py --ued --signal-geoms trajectory.xyz --calculation-type time-resolv
 - `--qmin`, `--qmax`, `--npoints`: Control q-grid parameters
 
 ## File Structure
-
+The package is located in the `src/iamxed` directory and contains the following files:
 - `xed.py`: Main entry point and CLI
 - `physics.py`: Core physics calculations and calculator classes
 - `io_utils.py`: File I/O and utility functions
@@ -40,13 +58,9 @@ python xed.py --ued --signal-geoms trajectory.xyz --calculation-type time-resolv
 - Matplotlib 
 - Pytest
 
-## Testing
-```bash
-pytest -v test/test_xed.py
-```
-
 ## License
 
+MIT License
 
 ## Authors
 

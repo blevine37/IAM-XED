@@ -4,15 +4,15 @@ Main script for X-ray and Electron Diffraction (XED) calculations.
 Handles command line interface and orchestrates calculations.
 """
 import numpy as np
-import matplotlib.pyplot as plt
-from typing import Optional, List, Tuple
 
-from io_utils import parse_cmd_args, output_logger, get_elements_from_input
-from physics import XRDDiffractionCalculator, UEDDiffractionCalculator
-from plotting import plot_static, plot_time_resolved
+from .io_utils import parse_cmd_args, output_logger, get_elements_from_input
+from .physics import XRDDiffractionCalculator, UEDDiffractionCalculator
+from .plotting import plot_static, plot_time_resolved
 
 def main():
     global logger
+
+    from sys import argv
 
     """Main function for XED calculations."""
     # Parse command line arguments
@@ -75,8 +75,8 @@ def main():
                 if args.plot:
                     plot_static(q, diff_signal, args.xrd, is_difference=True, plot_units=args.plot_units, r=r, pdf=diff_pdf)
                 if args.export:
-                    cmd_options = ' '.join(sys.argv[1:])
-                    header = f"# xed.py {cmd_options}"
+                    cmd_options = ' '.join(argv[1:])
+                    header = f"# iamxed {cmd_options}"
                     np.savetxt(args.export, np.column_stack((q, diff_signal)), header=header, comments='')
             elif args.calculation_type == 'time-resolved':
                 times, q, signal_raw, signal_smooth = calculator.calc_trajectory(
@@ -103,7 +103,7 @@ def main():
                 if args.plot:
                     plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf)
                 if args.export:
-                    cmd_options = ' '.join(sys.argv[1:])
+                    cmd_options = ' '.join(argv[1:])
                     header = f"# xed.py {cmd_options}"
                     np.savetxt(args.export, np.column_stack((q, signal)), header=header, comments='')
             elif args.calculation_type == 'time-resolved':

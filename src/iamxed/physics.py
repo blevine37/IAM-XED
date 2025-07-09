@@ -9,7 +9,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Dict
 
-from io_utils import read_xyz, read_xyz_trajectory, find_xyz_files, is_trajectory_file
+from .io_utils import read_xyz, read_xyz_trajectory, find_xyz_files, is_trajectory_file
 
 # Physical constants
 ANG_TO_BH = 1.8897259886
@@ -387,7 +387,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
     def calc_single(self, geom_file: str) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry UED pattern and PDF, or average over all geometries in a directory or trajectory file."""
         import os
-        from io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
+        from .io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
         if os.path.isdir(geom_file):
             xyz_files = find_xyz_files(geom_file)
             if not xyz_files:
