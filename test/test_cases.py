@@ -41,6 +41,12 @@ test_cases = [
 	    "output": "ued_traj.npz",
         "reference": "reference_ued_traj.npz"
     },
+    {
+        "dir": "test/cyclobutanone",
+        "command": "--xrd  --signal-geoms cycbut_traj.xyz  --calculation-type time-resolved --qmin 0.0 --qmax 5.29 --npoints 100 --timestep 40 --inelastic --export xrd_traj", 
+	    "output": "xrd_traj.npz",
+        "reference": "reference_xrd_traj.npz"
+    },
 ]
 
 test_ids = [
@@ -50,5 +56,6 @@ test_ids = [
     "CF3-ued-static",            #10.1146/annurev-physchem-082720-010539
     "CYCBUT-ued-c2-min-diff-static",
     "CYCBUT-xrd-c3-min-diff-static",
-    "CYCBUT-ued-traj" 
+    "CYCBUT-ued-traj",
+    "CYCBUT-xrd-traj" 
 ] 

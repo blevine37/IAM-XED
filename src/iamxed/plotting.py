@@ -130,7 +130,7 @@ def plot_time_resolved_pdf(times: np.ndarray, r: np.ndarray, pdfs: np.ndarray, s
     t_min = times.min() if smoothed else 0
     extent = (t_min, times.max(), r.min(), r.max())
     im = plt.imshow(pdfs, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
-    plt.colorbar(im, label='ΔP(r) (arb. units)')
+    plt.colorbar(im, label='ΔPDF(r) (arb. units)')
     plt.xlabel('Time (fs)')
     plt.ylabel('r (Å)')
     title = 'Time-Resolved PDF'

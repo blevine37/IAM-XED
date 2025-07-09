@@ -7,7 +7,7 @@
   - [x] ued single point for one geometry
   - [x] xrd difference between two geometries
   - [x] ued difference between two geometries
-  - [ ] xrd time-resolved signal from trajectory
+  - [x] xrd time-resolved signal from trajectory
   - [x] ued time-resolved signal from trajectory
   - [ ] xrd time-resolved signal from ensemble
   - [ ] ued time-resolved signal from ensemble
@@ -20,3 +20,4 @@
 - [ ] Write tests
 - [ ] Handling oscillatory sinc behavior for diff at long distances
 - [ ] Exporting data in other then atomic units
+- [ ] PDF for XRD

@@ -77,7 +77,7 @@ class BaseDiffractionCalculator(ABC):
         dt = times[1] - times[0] if len(times) > 1 else 1.0
         sigma_steps = sigma_fs / dt
         pad_width = int(np.ceil(3 * sigma_steps))  # 3 sigma padding
-        
+
         # Pad on both sides with edge values
         Z_padded = np.pad(Z, ((0, 0), (pad_width, pad_width)), mode='edge')
         
@@ -300,16 +300,30 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         atoms, trajectory = read_xyz_trajectory(trajfile)
         if not self.form_factors:
             self.load_form_factors()
-        Iat = self.calc_atomic_intensity(atoms)
-        sm0 = self.qfit * (self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0]) / Iat)
+            
+        # Calculate reference (t=0) intensities
+        Iat0 = self.calc_atomic_intensity(atoms)
+        Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
+        I0 = Iat0 + Imol0
+        
         signals = []
         for coords in trajectory:
+            # Calculate current frame intensities
+            Iat = self.calc_atomic_intensity(atoms)
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            sm = self.qfit * (Imol / Iat)
-            signals.append(sm - sm0)
+            I = Iat + Imol
+            
+            # Calculate relative difference in percent
+            rel = (I - I0) / I0 * 100
+            signals.append(rel)
+            
         signal_raw = np.array(signals).T
+        
+        # Calculate time axis
         dt_fs = timestep_au / 40 * 0.9675537016
         times = np.arange(signal_raw.shape[1]) * dt_fs
+        
+        # Apply temporal smoothing
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
         
         # Return dummy PDF arrays for compatibility with UED
