@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.9"]
+        python: [ "3.9", "3.10", "3.11", "3.12" ]
 
     runs-on: ubuntu-22.04
 
@@ -66,17 +66,16 @@ jobs:
         with:
           version: "0.4.20"
 
-
-      - name: Install package
-        run: uv pip install --system -e .[test]
+      - name: Test script with `uv run`
+        run: uv run python -m src.iamxed.iamxed --help
 
   test3:
     strategy:
       fail-fast: false
       matrix:
-        python: [ "3.7", "3.8", "3.9", "3.10", "3.11", "3.12" ]
+        python: [ "3.9" ]
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
