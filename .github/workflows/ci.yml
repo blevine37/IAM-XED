@@ -10,6 +10,7 @@ permissions:
 
 env:
   FORCE_COLOR: 1
+  PYTHONPATH: src
 
 jobs:
   test:
