@@ -36,7 +36,7 @@ jobs:
       run: uv run iamxed --help
 
     - name: Test running iamxed as script with `uv run`
-      run: uv run python -m src/iamxed/iamxed --help
+      run: uv run python -m src.iamxed.iamxed --help
 
     - name: Test iamxed with `uv run` using ued and xrd flags
       run: |
