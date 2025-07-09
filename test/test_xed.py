@@ -13,7 +13,7 @@ def run_command(test_dir, command):
     os.chdir(test_dir)
 
     try:
-        cmd = f"python {xed_path} {command}"
+        cmd = f"python3 {xed_path} {command}"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result
     finally:

@@ -41,7 +41,9 @@ python xed.py --ued --signal-geoms trajectory.xyz --calculation-type time-resolv
 - Pytest
 
 ## Testing
+```bash
 pytest -v test/test_xed.py
+```
 
 ## License
 

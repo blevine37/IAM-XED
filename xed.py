@@ -12,6 +12,8 @@ from physics import XRDDiffractionCalculator, UEDDiffractionCalculator
 from plotting import plot_static, plot_time_resolved
 
 def main():
+    global logger
+
     """Main function for XED calculations."""
     # Parse command line arguments
     args = parse_cmd_args()
@@ -35,7 +37,7 @@ def main():
 
     # Print basic info about mode and signal type
     mode_msg = f"Mode: {args.calculation_type} | Signal: {'XRD' if args.xrd else 'UED'}"
-    print(f"[IAM-XED] {mode_msg}")
+    logger.info(f"[IAM-XED] {mode_msg}")
         
     # Get unique elements from input geometries
     try:
@@ -123,4 +125,4 @@ def main():
 
 if __name__ == '__main__':
     import sys
-    sys.exit(main()) 
+    sys.exit(main())

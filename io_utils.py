@@ -11,6 +11,8 @@ from typing import List, Tuple, Optional
 
 def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logger:
     """Set up the logger for output messages."""
+    global logger
+
     logger = logging.getLogger()
     if debug:
         logger.setLevel(logging.DEBUG)
