@@ -364,24 +364,20 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         xyz_files = find_xyz_files(xyz_dir)
         if not xyz_files:
             raise ValueError(f"No XYZ files found in directory: {xyz_dir}")
-            
-        all_signals = []
+        all_Imol = []
+        all_Imol0 = []
         max_frames = 0
-        dt_fs = timestep_au / 40 * 0.9675537016  # Convert timestep to fs
-        
-        for xyz_file in tqdm(xyz_files, desc='Ensemble files'):
+        dt_fs = timestep_au / 40 * 0.9675537016
+        Iat0 = None
+        for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Ensemble files')):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
             if not self.form_factors:
                 self.load_form_factors()
-                
-            # Calculate reference (t=0) intensities
-            Iat0 = self.calc_atomic_intensity(atoms)  # This includes inelastic if enabled
+            if Iat0 is None:
+                Iat0 = self.calc_atomic_intensity(atoms)
             Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
-            I0 = Iat0 + Imol0
-            
-            # Calculate relative signals for each frame
-            signals = []
-            dt_fs = timestep_au / 40 * 0.9675537016  # Convert timestep to fs
+            all_Imol0.append(Imol0)
+            Imol_traj = []
             if tmax_fs is not None:
                 n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
             else:
@@ -391,35 +387,28 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
                 current_time = i * dt_fs
                 if tmax_fs is not None and current_time > tmax_fs:
                     break
-                    
-                #Iat = self.calc_atomic_intensity(atoms)  # This includes inelastic if enabled
                 Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], frame)
-                I = Iat0 + Imol
-                # Calculate relative difference in percent
-                rel = (I - I0) / I0 * 100
-                signals.append(rel)
-            
-            signals = np.array(signals).T  # Shape: [q_points, time_points]
-            all_signals.append(signals)
-            max_frames = max(max_frames, signals.shape[1])
-        
-        # Pad all signals to max_frames with NaN
-        padded_signals = []
-        for signals in all_signals:
-            if signals.shape[1] < max_frames:
-                pad_width = ((0, 0), (0, max_frames - signals.shape[1]))
-                padded = np.pad(signals, pad_width, mode='constant', constant_values=np.nan)
+                Imol_traj.append(Imol)
+            Imol_traj = np.array(Imol_traj).T
+            all_Imol.append(Imol_traj)
+            max_frames = max(max_frames, Imol_traj.shape[1])
+        padded_Imol = []
+        for Imol in all_Imol:
+            if Imol.shape[1] < max_frames:
+                pad_width = ((0, 0), (0, max_frames - Imol.shape[1]))
+                padded = np.pad(Imol, pad_width, mode='constant', constant_values=np.nan)
             else:
-                padded = signals
-            padded_signals.append(padded)
-        
-        # Stack and average signals, ignoring NaN values
-        signal_raw = np.nanmean(np.stack(padded_signals, axis=0), axis=0)
-        
-        # Calculate time axis
+                padded = Imol
+            padded_Imol.append(padded)
+        stacked_Imol = np.stack(padded_Imol, axis=0)
+        mean_Imol = np.nanmean(stacked_Imol, axis=0)
+        mean_Imol0 = np.nanmean(np.stack(all_Imol0, axis=0), axis=0)
+        if Iat0 is None:
+            raise ValueError("No valid trajectories found to compute atomic intensity (Iat0).")
+        numerator = (Iat0[:, None] + mean_Imol) - (Iat0[:, None] + mean_Imol0[:, None])
+        denominator = (Iat0[:, None] + mean_Imol0[:, None])
+        signal_raw = numerator / denominator * 100
         times = np.arange(max_frames) * dt_fs
-        
-        # Apply temporal smoothing
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
         
         # Return dummy PDF arrays for compatibility with UED
@@ -617,8 +606,6 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
         else:
             n_frames = len(trajectory)
-        if n_frames < 5:
-            print(f"Processing {n_frames} frames (progress bar may not be visible)")
         for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Trajectory frames', total=n_frames, mininterval=0, dynamic_ncols=True)):
             # Check if we've reached the time limit
             current_time = i * dt_fs
@@ -663,79 +650,58 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         xyz_files = find_xyz_files(xyz_dir)
         if not xyz_files:
             raise ValueError(f"No XYZ files found in directory: {xyz_dir}")
-            
-        all_signals = []
+        all_Imol = []
+        all_Imol0 = []
         all_pdfs = []
         max_frames = 0
-        dt_fs = timestep_au / 40 * 0.9675537016  # Convert timestep to fs
-        
-        # Calculate q grid in Angstroms for PDF
+        dt_fs = timestep_au / 40 * 0.9675537016
+        sfit = self.qfit
         q_ang = self.qfit / 0.529177
         r = q_ang.copy()
-        
-        for xyz_file in tqdm(xyz_files, desc='Ensemble files'):
+        Iat0 = None
+        all_s = []  # Will hold s_k(t) for each trajectory
+        for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Ensemble files')):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
             if not self.form_factors:
                 self.load_form_factors()
-                
-            # Calculate signal for each frame in this trajectory
-            signals = []
-            pdfs = []
-            
-            # Calculate reference (t=0) intensities
-            Iat = self.calc_atomic_intensity(atoms)
-            Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
-            sm0 = self.qfit * (Imol0 / Iat)
-            sm0 = np.real(sm0)
-            
-            for i, coords in enumerate(tqdm(trajectory, desc='Frames', leave=False, total=len(trajectory))):
-                # Check if we've reached the time limit
+            if Iat0 is None:
+                Iat0 = self.calc_atomic_intensity(atoms)
+            s_traj = []
+            if tmax_fs is not None:
+                n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
+            else:
+                n_frames = len(trajectory)
+            for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Frames', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
                 current_time = i * dt_fs
                 if tmax_fs is not None and current_time > tmax_fs:
                     break
-                    
                 Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-                sm = self.qfit * (Imol / Iat)
-                sm = np.real(sm)
-                rel = sm - sm0
-                
-                # Calculate PDF for this frame
-                sm_ang = rel / 0.529177  # Convert to Angstrom^-1 for PDF calculation
-                pdf = self.FT(q_ang, sm_ang, pdf_alpha)
-                
-                signals.append(rel)
-                pdfs.append(pdf)
-            
-            signals = np.array(signals).T  # shape: [q, t]
-            pdfs = np.array(pdfs).T  # shape: [r, t]
-            
-            all_signals.append(signals)
-            all_pdfs.append(pdfs)
-            max_frames = max(max_frames, signals.shape[1])
-            
-        # Pad all signals and PDFs to max_frames with NaN
-        all_signals_padded = []
-        all_pdfs_padded = []
-        for sig, pdf in zip(all_signals, all_pdfs):
-            if sig.shape[1] < max_frames:
-                pad_width = ((0, 0), (0, max_frames - sig.shape[1]))
-                sig_padded = np.pad(sig, pad_width, mode='constant', constant_values=np.nan)
-                pdf_padded = np.pad(pdf, pad_width, mode='constant', constant_values=np.nan)
+                s = sfit * (Imol / Iat0)
+                s_traj.append(s)
+            s_traj = np.array(s_traj).T  # [q, t]
+            all_s.append(s_traj)
+            max_frames = max(max_frames, s_traj.shape[1])
+        # Pad all s to max_frames with NaN
+        padded_s = []
+        for s in all_s:
+            if s.shape[1] < max_frames:
+                pad_width = ((0, 0), (0, max_frames - s.shape[1]))
+                padded = np.pad(s, pad_width, mode='constant', constant_values=np.nan)
             else:
-                sig_padded = sig
-                pdf_padded = pdf
-            all_signals_padded.append(sig_padded)
-            all_pdfs_padded.append(pdf_padded)
-            
-        # Average with nanmean
-        signal_raw = np.nanmean(np.stack(all_signals_padded, axis=0), axis=0)
-        pdfs_raw = np.nanmean(np.stack(all_pdfs_padded, axis=0), axis=0)
-        
-        # Calculate time axis
+                padded = s
+            padded_s.append(padded)
+        stacked_s = np.stack(padded_s, axis=0)  # [n_traj, q, t]
+        mean_s = np.nanmean(stacked_s, axis=0)   # [q, t]
+        mean_s0 = np.nanmean(stacked_s[:, :, 0], axis=0)  # [q]
+        # Final signal: mean_s(t) - mean_s(0)
+        signal_raw = np.real(mean_s - mean_s0[:, None])
+        # Now calculate PDF from the final signal
+        sm_ang = signal_raw / 0.529177  # Convert to Angstrom^-1 for PDF calculation
+        pdfs_raw = np.empty((len(q_ang), signal_raw.shape[1]))
+        for t in range(signal_raw.shape[1]):
+            pdfs_raw[:, t] = self.FT(q_ang, sm_ang[:, t], pdf_alpha)
+        pdfs_raw = np.real(pdfs_raw)
         times = np.arange(max_frames) * dt_fs
-        
-        # Apply temporal smoothing
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
         pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
-        
         return times, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth 

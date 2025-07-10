@@ -47,6 +47,18 @@ test_cases = [
 	    "output": "xrd_traj.npz",
         "reference": "reference_xrd_traj.npz"
     },
+    {
+        "dir": "test/cyclobutanone",
+        "command": "--ued --signal-geoms ./ensemble/ --calculation-type time-resolved --qmin 0 --qmax 4 --npoints 100 --timestep 40.0 --export ued_ensemble",
+	    "output": "ued_ensemble.npz",
+        "reference": "reference_ued_ensemble.npz"
+    },
+    {
+        "dir": "test/cyclobutanone",
+        "command": "--xrd --signal-geoms ./ensemble/ --calculation-type time-resolved --qmin 0 --qmax 4 --npoints 100 --timestep 40.0  --inelastic --export xrd_ensemble",
+	    "output": "xrd_ensemble.npz",
+        "reference": "reference_xrd_ensemble.npz"
+    },
 ]
 
 test_ids = [
@@ -57,5 +69,7 @@ test_ids = [
     "CYCBUT-ued-c2-min-diff-static",
     "CYCBUT-xrd-c3-min-diff-static",
     "CYCBUT-ued-traj",
-    "CYCBUT-xrd-traj" 
+    "CYCBUT-xrd-traj" ,
+    "CYCBUT-ued-ensemble",
+    "CYCBUT-xrd-ensemble"
 ] 
