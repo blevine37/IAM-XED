@@ -156,12 +156,6 @@ def parse_cmd_args(args: Optional[List[str]] = None):
                            help='Geometries for calculating signal (xyz file or directory)')
     general_sec.add_argument('--reference-geoms', type=str,
                            help='Reference geometries for difference calculation')
-    general_sec.add_argument('--ensemble-dir', type=str,
-                           help='Directory containing ensemble xyz files')
-    general_sec.add_argument('--timestep', type=float, default=10.0,
-                           help='Timestep between frames (atomic units)')
-    
-    # Calculation type option
     general_sec.add_argument('--calculation-type', type=str, choices=['static', 'time-resolved'], default='static',
         help='Either perform static (average/ensemble) or time-resolved (2D map) calculation.')
     
@@ -174,6 +168,13 @@ def parse_cmd_args(args: Optional[List[str]] = None):
     signal_sec.add_argument('--inelastic', action='store_true',
                            help='Include inelastic atomic contribution for XRD')
     
+    # Time-resolved options
+    time_sec = parser.add_argument_group("Time-resolved options")
+    time_sec.add_argument('--timestep', type=float, default=10.0,
+                       help='Timestep between frames (atomic units)')
+    time_sec.add_argument('--tmax', type=float,
+                       help='Maximum time to calculate up to (femtoseconds)')
+
     # Processing options
     proc_sec = parser.add_argument_group("Processing options")
     proc_sec.add_argument('--fwhm', type=float, default=150.0,
@@ -189,6 +190,8 @@ def parse_cmd_args(args: Optional[List[str]] = None):
                         help="Print debug output")
     out_sec.add_argument('--plot', action='store_true',
                         help='Plot the results')
+    out_sec.add_argument('--plot-flip', action='store_true',
+                        help='Flip x and y axes in all plots')
     out_sec.add_argument('--export', type=str,
                         help='Export calculated data to file')
     out_sec.add_argument('--plot-units', type=str, default='bohr-1', choices=['bohr-1', 'angstrom-1'],

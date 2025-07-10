@@ -62,10 +62,11 @@ def main():
         if not os.path.exists(args.reference_geoms):
             logger.error(f"ERROR: Reference geometries path {args.reference_geoms} does not exist.")
             return 1
-        if not os.path.isfile(args.reference_geoms):
-            logger.error('ERROR: Reference geometries path is not a file, only single geometry file is supported for reference geometries.')
+        if not os.path.isfile(args.reference_geoms) and not os.path.isdir(args.reference_geoms):
+            logger.error('ERROR: Reference geometries path is neither a file nor a directory.')
             return 1
         ref_calc = True
+        ref_geom_type = 'file' if os.path.isfile(args.reference_geoms) else 'directory'
 
     # Print input parameters
     logger.info('INPUT PARAMETERS\n----------------')
@@ -75,6 +76,8 @@ def main():
             add = 'a.t.u.'
         elif key == 'signal_geoms':
             add = f'({signal_geom_type})'
+        elif key == 'reference_geoms' and value is not None:
+            add = f'({ref_geom_type})'
         elif key in ['qmin', 'qmax']:
             add = '1/Bohr'
         logger.info(f"- {key:20s}: {value}  {add}")
@@ -100,12 +103,14 @@ def main():
             logger.info(' Inelastic atomic contribution will NOT be included in XRD calculation.')
 
     if signal_geom_type == 'file':
-        logger.info(f' Signal geometries will be read from file ({args.signal_geoms}) - no ensemble calculation.')
+        logger.info(f' Signal geometries will be read from file ({args.signal_geoms})')
     elif signal_geom_type == 'directory':
         logger.info(f' Signal geometries will be read from directory ({args.signal_geoms}) - ensemble calculation will be performed.')
 
     if ref_calc:
-        logger.info(' Reference provided, difference calculation will be performed.')
+        logger.info(f' Reference provided ({args.reference_geoms}), difference calculation will be performed.')
+        if ref_geom_type == 'directory':
+            logger.info(' Reference is a directory - ensemble averaging will be used for reference.')
     else:
         logger.info(' No reference provided, only signal calculation will be performed.')
 
@@ -143,45 +148,22 @@ def main():
                 q, diff_signal, r, diff_pdf = calculator.calc_difference(args.signal_geoms, args.reference_geoms)
                 if args.plot:
                     logger.info('Plotting static difference signal...')
-                    plot_static(q, diff_signal, args.xrd, is_difference=True, plot_units=args.plot_units, r=r, pdf=diff_pdf)
+                    plot_static(q, diff_signal, args.xrd, is_difference=True, plot_units=args.plot_units, r=r, pdf=diff_pdf, plot_flip=args.plot_flip)
                 if args.export:
                     logger.info(f'Exporting static difference data to {args.export}...')
                     cmd_options = ' '.join(argv[1:])
                     header = f"# iamxed {cmd_options}"
                     np.savetxt(args.export, np.column_stack((q, diff_signal)), header=header, comments='')
             elif args.calculation_type == 'time-resolved':
-                logger.info('Performing time-resolved difference calculation...')
-                times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_trajectory(
-                    args.signal_geoms,
-                    timestep_au=args.timestep,
-                    fwhm_fs=args.fwhm,
-                    pdf_alpha=args.pdf_alpha
-                )
-                q_ref, ref_signal, r_ref, ref_pdf = calculator.calc_single(args.reference_geoms)
-                diff_raw = (signal_raw - ref_signal[:, None]) / ref_signal[:, None] * 100
-                diff_smooth = (signal_smooth - ref_signal[:, None]) / ref_signal[:, None] * 100
-                if args.plot:
-                    logger.info('Plotting time-resolved difference signal...')
-                    plot_time_resolved(times, q, diff_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
-                    plot_time_resolved(times, q, diff_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
-                    if not args.xrd and r_ref is not None and ref_pdf is not None:  # Plot PDFs for UED only
-                        logger.info('Plotting time-resolved PDFs...')
-                        plot_time_resolved_pdf(times, r, pdfs_raw, smoothed=False, fwhm_fs=args.fwhm)
-                        plot_time_resolved_pdf(times, r, pdfs_smooth, smoothed=True, fwhm_fs=args.fwhm)
-                if args.export:
-                    logger.info(f'Exporting time-resolved difference data to {args.export}...')
-                    if not args.xrd:  # Include PDFs for UED only
-                        np.savez(args.export, times=times, q=q, signal_raw=diff_raw, signal_smooth=diff_smooth,
-                               r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth)
-                    else:
-                        np.savez(args.export, times=times, q=q, signal_raw=diff_raw, signal_smooth=diff_smooth)
+                logger.error('ERROR: Time-resolved calculations with a reference are not supported.')
+                return 1
         else:
             if args.calculation_type == 'static':
                 logger.info('Performing static calculation...')
                 q, signal, r, pdf = calculator.calc_single(args.signal_geoms)
                 if args.plot:
                     logger.info('Plotting static signal...')
-                    plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf)
+                    plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf, plot_flip=args.plot_flip)
                 if args.export:
                     logger.info(f'Exporting static data to {args.export}...')
                     cmd_options = ' '.join(argv[1:])
@@ -189,25 +171,32 @@ def main():
                     np.savetxt(args.export, np.column_stack((q, signal)), header=header, comments='')
             elif args.calculation_type == 'time-resolved':
                 logger.info('Performing time-resolved calculation...')
-                # Both XRD and UED calculators now return the same number of values
-                times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_trajectory(
-                    args.signal_geoms,
-                    timestep_au=args.timestep,
-                    fwhm_fs=args.fwhm,
-                    pdf_alpha=args.pdf_alpha
-                )
-                
+                if signal_geom_type == 'directory':
+                    times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_ensemble(
+                        args.signal_geoms,
+                        timestep_au=args.timestep,
+                        fwhm_fs=args.fwhm,
+                        pdf_alpha=args.pdf_alpha,
+                        tmax_fs=args.tmax
+                    )
+                else:
+                    times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_trajectory(
+                        args.signal_geoms,
+                        timestep_au=args.timestep,
+                        fwhm_fs=args.fwhm,
+                        pdf_alpha=args.pdf_alpha,
+                        tmax_fs=args.tmax
+                    )
                 # Get smoothed time axis for smoothed data
                 _, times_smooth = calculator.gaussian_smooth_2d_time(signal_raw, times, args.fwhm)
-                
                 if args.plot:
                     logger.info('Plotting time-resolved signal...')
-                    plot_time_resolved(times, q, signal_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm)
-                    plot_time_resolved(times_smooth, q, signal_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm)
+                    plot_time_resolved(times, q, signal_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
+                    plot_time_resolved(times_smooth, q, signal_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
                     if not args.xrd:  # Plot PDFs for UED only
                         logger.info('Plotting time-resolved PDFs...')
-                        plot_time_resolved_pdf(times, r, pdfs_raw, smoothed=False, fwhm_fs=args.fwhm)
-                        plot_time_resolved_pdf(times_smooth, r, pdfs_smooth, smoothed=True, fwhm_fs=args.fwhm)
+                        plot_time_resolved_pdf(times, r, pdfs_raw, smoothed=False, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
+                        plot_time_resolved_pdf(times_smooth, r, pdfs_smooth, smoothed=True, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
                 if args.export:
                     logger.info(f'Exporting time-resolved data to {args.export}...')
                     if not args.xrd:  # Include PDFs for UED only
