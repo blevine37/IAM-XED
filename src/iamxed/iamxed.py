@@ -4,6 +4,7 @@ Main script for X-ray and Electron Diffraction (XED) calculations.
 Handles command line interface and orchestrates calculations.
 """
 import numpy as np
+import os
 
 from .io_utils import parse_cmd_args, output_logger, get_elements_from_input
 from .physics import XRDDiffractionCalculator, UEDDiffractionCalculator
@@ -14,57 +15,24 @@ def main():
 
     from sys import argv
 
-    """Main function for XED calculations."""
+    """Main function for x-ray and electron diffraction calculations."""
     # Parse command line arguments
     args = parse_cmd_args()
     
     # Set up logger
     logger = output_logger(args.log_to_file, args.debug)
 
-    # Print code header and copyright
+    # Print code header
     logger.info('\n###################'\
                 '\n###  IAM-XED   ###'\
                 '\n###################\n')
     logger.info("Independent Atom Model code for Ultrafast Electron and X-Ray Diffraction.\n"
-                "Copyright (c) 2025 Authors.\n")
+                "Copyright (c) 2025 Suchan J., Janos J.\n")
 
-    # Validate input arguments
-    if not args.xrd and not args.ued:
-        logger.error("ERROR: No signal type specified. Use --xrd or --ued or both to specify the signal type.")
-        return 1
-    if args.xrd and args.ued:
-        logger.error("ERROR: Cannot specify both --xrd and --ued.")
-        return 1
-    if not args.signal_geoms:
-        logger.error("ERROR: No signal geometries provided. Use --signal-geoms to specify the geometry file or folder.")
-        return 1
-    if not hasattr(args, 'calculation_type') or args.calculation_type is None:
-        logger.error("ERROR: Must specify --calculation-type (static, time-resolved)")
-        return 1
-
-    # Check if signal_geoms is a file or directory
-    import os
-    if not os.path.exists(args.signal_geoms):
-        logger.error(f"ERROR: Signal geometries path {args.signal_geoms} does not exist.")
-        return 1
-    else:
-        if os.path.isfile(args.signal_geoms):
-            signal_geom_type = 'file'
-        elif os.path.isdir(args.signal_geoms):
-            signal_geom_type = 'directory'
-        else:
-            logger.error('ERROR: Signal geometries path is neither a file nor a directory.')
-            return 1
-
-    if args.reference_geoms is None:
-        ref_calc = False
-    else:
-        if not os.path.exists(args.reference_geoms):
-            logger.error(f"ERROR: Reference geometries path {args.reference_geoms} does not exist.")
-            return 1
-        if not os.path.isfile(args.reference_geoms) and not os.path.isdir(args.reference_geoms):
-            logger.error('ERROR: Reference geometries path is neither a file nor a directory.')
-            return 1
+    # Determine geometry types
+    signal_geom_type = 'file' if os.path.isfile(args.signal_geoms) else 'directory'
+    ref_calc = False
+    if args.reference_geoms is not None:
         ref_calc = True
         ref_geom_type = 'file' if os.path.isfile(args.reference_geoms) else 'directory'
 
@@ -88,9 +56,7 @@ def main():
         output += 'Static '
     elif args.calculation_type == 'time-resolved':
         output += 'Time-resolved '
-    if args.ued and args.xrd:
-        output += 'UED and XRD calculation will be performed.'
-    elif args.ued:
+    if args.ued:
         output += 'UED calculation will be performed.'
     elif args.xrd:
         output += 'XRD calculation will be performed.'

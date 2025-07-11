@@ -38,10 +38,10 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
     if is_xrd:
         if is_difference:
             label = 'ΔI/I₀ (%)'
-            title = 'XRD Difference Pattern'
+            title = 'XRD Difference Signal'
         else:
             label = 'I(q)'
-            title = 'XRD Pattern'
+            title = 'XRD Signal'
     else:
         if plot_units == 'angstrom-1':
             sm_unit = '(Å⁻¹)'
@@ -49,10 +49,10 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
             sm_unit = '(Bohr⁻¹)'
         if is_difference:
             label = f'ΔsM(q) {sm_unit}'
-            title = 'UED Difference Pattern'
+            title = 'UED Difference Signal'
         else:
             label = f'sM(q) {sm_unit}'
-            title = 'UED Pattern'
+            title = 'UED Signal'
     if plot_flip:
         plt.xlabel(label)
     else:
@@ -78,7 +78,7 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
         plt.show()
 
 def plot_time_resolved(times: np.ndarray, q: np.ndarray, signal: np.ndarray, is_xrd: bool, plot_units: str = 'bohr-1', smoothed: bool = False, fwhm_fs: float = 150.0, plot_flip: bool = False) -> None:
-    """Plot time-resolved diffraction pattern (unsmoothed or smoothed).
+    """Plot time-resolved diffraction signal (raw or smoothed).
     Args:
         times: Time points in fs
         q: Q-values in atomic units
@@ -118,9 +118,9 @@ def plot_time_resolved(times: np.ndarray, q: np.ndarray, signal: np.ndarray, is_
         plt.ylabel(q_label)
         plt.colorbar(im, label=f'ΔI/I₀ (%)' if is_xrd else f'ΔsM(q) {sm_unit}')
     if smoothed:
-        plt.title(f'Time-Resolved {"XRD" if is_xrd else "UED"} Pattern (Smoothed, FWHM={fwhm_fs} fs)')
+        plt.title(f'Time-Resolved {"XRD" if is_xrd else "UED"} Signal (Smoothed, FWHM={fwhm_fs} fs)')
     else:
-        plt.title(f'Time-Resolved {"XRD" if is_xrd else "UED"} Pattern (Unsmoothed)')
+        plt.title(f'Time-Resolved {"XRD" if is_xrd else "UED"} Signal')
     plt.tight_layout()
     plt.show()
 

@@ -142,6 +142,15 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
         raise FileNotFoundError('Signal geometry file not found.')
     return sorted(set(elements))
 
+def validate_path(path: str) -> str:
+    """Validate that a path exists and is either a file or directory.
+    """
+    if not os.path.exists(path):
+        raise argparse.ArgumentTypeError(f"Path does not exist: {path}")
+    if not os.path.isfile(path) and not os.path.isdir(path):
+        raise argparse.ArgumentTypeError(f"Path is neither a file nor a directory: {path}")
+    return path
+
 def parse_cmd_args(args: Optional[List[str]] = None):
     """Parse command line arguments.
     
@@ -152,18 +161,19 @@ def parse_cmd_args(args: Optional[List[str]] = None):
     
     # General options
     general_sec = parser.add_argument_group("General options")
-    general_sec.add_argument('--signal-geoms', type=str, required=True,
+    general_sec.add_argument('--signal-geoms', type=validate_path, required=True,
                            help='Geometries for calculating signal (xyz file or directory)')
-    general_sec.add_argument('--reference-geoms', type=str,
+    general_sec.add_argument('--reference-geoms', type=validate_path,
                            help='Reference geometries for difference calculation')
     general_sec.add_argument('--calculation-type', type=str, choices=['static', 'time-resolved'], default='static',
         help='Either perform static (average/ensemble) or time-resolved (2D map) calculation.')
     
     # Signal type options
     signal_sec = parser.add_argument_group("Signal type options")
-    signal_sec.add_argument('--ued', action='store_true',
+    signal_type = signal_sec.add_mutually_exclusive_group(required=True)
+    signal_type.add_argument('--ued', action='store_true',
                            help='Performs UED calculation')
-    signal_sec.add_argument('--xrd', action='store_true',
+    signal_type.add_argument('--xrd', action='store_true',
                            help='Performs XRD calculation')
     signal_sec.add_argument('--inelastic', action='store_true',
                            help='Include inelastic atomic contribution for XRD')
@@ -214,6 +224,4 @@ def parse_cmd_args(args: Optional[List[str]] = None):
         parser.print_help()
         sys.exit(0)
     
-    # Set calculation_type directly from argument (no auto-detection)
-    # parsed_args.calculation_type is already set by argparse
     return parsed_args 
