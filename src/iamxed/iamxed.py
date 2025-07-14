@@ -26,7 +26,7 @@ def main():
     logger.info('\n###################'\
                 '\n###  IAM-XED   ###'\
                 '\n###################\n')
-    logger.info("Independent Atom Model code for Ultrafast Electron and X-Ray Diffraction.\n"
+    logger.info("Independent Atom Model code for X-ray and ultrafast Electron Diffraction.\n"
                 "Copyright (c) 2025 Suchan J., Janos J.\n")
 
     # Determine geometry types
