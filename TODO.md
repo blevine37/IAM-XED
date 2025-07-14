@@ -16,9 +16,9 @@
 - [ ] Checking units in plot labels
 
 ### Additional: 
-- [ ] Log to file option, debug option
+- [x] Log to file option, debug option
 - [ ] Better plotting
-- [ ] Write tests
+- [x] Write tests
 - [ ] Handling oscillatory sinc behavior for diff at long distances
 - [ ] Exporting data in other then atomic units
 - [ ] PDF for XRD
