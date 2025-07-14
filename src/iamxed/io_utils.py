@@ -160,6 +160,37 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
     return sorted(elements)
 
 
+def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: np.ndarray):
+    """Export static data to a file in a npz format suitable for further analysis."""
+    cmd_options = ' '.join(flags_list)
+    header = f"# iamxed {cmd_options}\n"
+    np.savetxt(filename+'.txt', np.column_stack((q, signal)), comments=header, header='# q    signal')
+    logger.info(f"Exporting static data to '{filename}.txt'.")
+
+
+def export_tr_data(args: argparse.Namespace, flags_list: list, times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
+                   signal_raw: np.ndarray, signal_smooth: np.ndarray, r: np.ndarray = None, pdfs_raw: np.ndarray = None,
+                   pdfs_smooth: np.ndarray = None):
+    """Export time-resoloved data to a file in a npz format suitable for further analysis. UED exports PDFs as well."""
+    cmd_options = ' '.join(flags_list)
+    header = f"# iamxed {cmd_options}\n"
+    if args.ued:  # Include PDFs for UED only
+        np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw,
+            signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth)
+        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdfs_raw, pdfs_smooth)), comments=header, header='# q    PDF    convoluted PDF') # todo: add units
+        # logger.info(f"Exporting time-resolved PDF to '{args.export}.npz'.")
+        # todo: export readable files in txt
+    else:
+        np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw,
+            signal_smooth=signal_smooth)
+        # todo: export readable files in txt
+    logger.info(f"Exporting all time-resolved data to '{args.export}.npz'.")
+
+
+
+# logger.info(f'Exporting time-resolved data to {args.export}...')
+
+
 def parse_cmd_args():
     """Parse command line arguments.
     Returns:
@@ -268,7 +299,8 @@ def parse_cmd_args():
     out_sec.add_argument('--plot-flip', action='store_true',
                         help='Flip x and y axes in all plot. Default: False.')
     out_sec.add_argument('--export', type=str,
-                        help='Export calculated data to file.')
+                        help='Provide a file name to which calculated data will be exported. File will be named as'
+                             ' <filename>.txt. Default: None.')
     out_sec.add_argument('--plot-units', type=str, default='bohr-1', choices=['bohr-1', 'angstrom-1'],
                         help="Units for plotting the q axis: 'bohr-1' (default) or 'angstrom-1'.")
     

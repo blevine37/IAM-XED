@@ -7,7 +7,7 @@ import numpy as np
 import os
 from argparse import Namespace
 
-from .io_utils import parse_cmd_args, output_logger, get_elements_from_input
+from .io_utils import parse_cmd_args, output_logger, get_elements_from_input, export_static_data, export_tr_data
 from .physics import XRDDiffractionCalculator, UEDDiffractionCalculator
 from .plotting import plot_static, plot_time_resolved, plot_time_resolved_pdf
 
@@ -147,14 +147,14 @@ def iamxed(args: Namespace):
             elements=elements,
             inelastic=args.inelastic
         )
-    else:  # UED
+    elif args.ued:
         calculator = UEDDiffractionCalculator(
             q_start=args.qmin,
             q_end=args.qmax,
             num_point=args.npoints,
             elements=elements
         )
-    logger.info("Calculator initialized.")
+    logger.debug("[DEBUG]: Calculator initialized.")
 
     # Perform calculation based on type
     try:
@@ -166,10 +166,7 @@ def iamxed(args: Namespace):
                     logger.info('Plotting static difference signal...')
                     plot_static(q, diff_signal, args.xrd, is_difference=True, plot_units=args.plot_units, r=r, pdf=diff_pdf, plot_flip=args.plot_flip)
                 if args.export:
-                    logger.info(f'Exporting static difference data to {args.export}...')
-                    cmd_options = ' '.join(argv[1:])
-                    header = f"# iamxed {cmd_options}"
-                    np.savetxt(args.export, np.column_stack((q, diff_signal)), header=header, comments='')
+                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=diff_signal)
             elif args.calculation_type == 'time-resolved':
                 logger.error('ERROR: Time-resolved calculations with a reference are not supported.')
                 return 1
@@ -181,10 +178,7 @@ def iamxed(args: Namespace):
                     logger.info('Plotting static signal...')
                     plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf, plot_flip=args.plot_flip)
                 if args.export:
-                    logger.info(f'Exporting static data to {args.export}...')
-                    cmd_options = ' '.join(argv[1:])
-                    header = f"# xed.py {cmd_options}"
-                    np.savetxt(args.export, np.column_stack((q, signal)), header=header, comments='')
+                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=signal)
             elif args.calculation_type == 'time-resolved':
                 logger.info('Performing time-resolved calculation...')
                 if signal_geom_type == 'directory':
@@ -214,12 +208,13 @@ def iamxed(args: Namespace):
                         plot_time_resolved_pdf(times, r, pdfs_raw, smoothed=False, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
                         plot_time_resolved_pdf(times_smooth, r, pdfs_smooth, smoothed=True, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
                 if args.export:
-                    logger.info(f'Exporting time-resolved data to {args.export}...')
-                    if not args.xrd:  # Include PDFs for UED only
-                        np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw, signal_smooth=signal_smooth,
-                               r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth)
-                    else:
-                        np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw, signal_smooth=signal_smooth)
+                    if args.ued:  # Include PDFs for UED only
+                        export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
+                            signal_raw=signal_raw, signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw,
+                            pdfs_smooth=pdfs_smooth)
+                    elif args.xrd:
+                        export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
+                            signal_raw=signal_raw, signal_smooth=signal_smooth)
     except Exception as e:
         logger.error(f"Error during calculation: {str(e)}")
         return 1
