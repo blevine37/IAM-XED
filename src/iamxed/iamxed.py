@@ -115,12 +115,13 @@ def iamxed(args: Namespace):
                 logger.info('No reference provided, only signal calculation will be performed.')
 
     ### code ###
-    # check that args are Namespace in case iamxed is called from python script
-    if not isinstance(args, Namespace):
-        raise TypeError("Expected args for iamxed() to be a Namespace object.")
-
     # Set up logger
     logger = output_logger(args.log_to_file, args.debug)
+
+    # check that args are Namespace in case iamxed is called from python script
+    if not isinstance(args, Namespace):
+        logger.error("ERROR: Expected args for iamxed() to be a Namespace object.")
+        raise TypeError("Expected args for iamxed() to be a Namespace object.")
 
     # Determine geometry types
     signal_geom_type = 'file' if os.path.isfile(args.signal_geoms) else 'directory'

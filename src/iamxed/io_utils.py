@@ -12,7 +12,7 @@ def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logg
     """Set up the logger for output messages."""
     global logger
 
-    logger = logging.getLogger()
+    logger = logging.getLogger("my_logger")
     if debug:
         logger.setLevel(logging.DEBUG)
     else:
@@ -52,10 +52,12 @@ def read_xyz(filename: str) -> Tuple[List[str], np.ndarray]:
                 atoms.append(atom)
                 coordinates.append([float(x), float(y), float(z)])
             except ValueError as e:
+                logger.error(f"ERROR: Invalid line format in XYZ file ({filename}): {line.strip()}")
                 raise ValueError(f"Invalid line format in XYZ file ({filename}): {line.strip()}") from e
     coordinates = [[w * ANG_TO_BH for w in ww] for ww in coordinates]
     coordinates = np.asarray(coordinates)
     if n_atoms != len(coordinates):
+        logger.error('ERROR: Number of atoms in xyz file does not match the number of lines.')
         raise ValueError('Number of atoms in xyz file does not match the number of lines.')
     return atoms, coordinates
 
@@ -75,6 +77,7 @@ def read_xyz_trajectory(filename: str) -> Tuple[List[str], np.ndarray]:
             try:
                 n_atoms = int(line.strip())
             except ValueError:
+                logger.error(f"ERROR: Expected number of atoms at start of frame, got: {line}")
                 raise ValueError(f"Expected number of atoms at start of frame, got: {line}")
             _ = f.readline() # Skip comment line
             frame_atoms = []
@@ -82,17 +85,20 @@ def read_xyz_trajectory(filename: str) -> Tuple[List[str], np.ndarray]:
             for _ in range(n_atoms):
                 parts = f.readline().split()
                 if len(parts) != 4:
+                    logger.error(f"ERROR: Invalid atom line: {parts}")
                     raise ValueError(f"Invalid atom line: {parts}")
                 try:
                     atom, x, y, z = parts
                     frame_atoms.append(atom)
                     frame_coords.append([float(x), float(y), float(z)])
                 except ValueError as e:
+                    logger.error(f"ERROR: Invalid coordinate values in atom line: {parts}")
                     raise ValueError(f"Invalid coordinate values in atom line: {parts}") from e
             if first_frame:
                 atoms = frame_atoms
                 first_frame = False
             elif atoms != frame_atoms:
+                logger.error("ERROR: Atom labels don't match across frames.")
                 raise ValueError("Atom labels don't match across frames.")
             frame_coords = [[w * ANG_TO_BH for w in xyz] for xyz in frame_coords]
             trajectory.append(frame_coords)
@@ -105,6 +111,7 @@ def find_xyz_files(directory: str) -> List[str]:
     xyz_files = sorted([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.xyz')])
 
     if not xyz_files:
+        logger.error('ERROR: No XYZ files found in directory.')
         raise FileNotFoundError('No XYZ files found in directory.')
 
     return xyz_files
@@ -157,6 +164,7 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
             atoms, _ = read_xyz(xyz_files[0])
         elements.update(atoms)
     else:
+        logger.error('ERROR: Signal geometry file not found.')
         raise FileNotFoundError('Signal geometry file not found.')
     return sorted(elements)
 

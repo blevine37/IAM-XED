@@ -17,6 +17,9 @@ except ImportError:
 from .io_utils import read_xyz, read_xyz_trajectory, find_xyz_files, is_trajectory_file
 from .XSF.xsf_data_elastic import XSF_DATA
 from .ESF.esf_data import ESF_DATA
+import logging
+
+logger = logging.getLogger("my_logger") # getting logger
 
 # Physical constants
 ANG_TO_BH = 1.8897259886
@@ -156,8 +159,9 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         self.form_factors = {}
         for el in self.elements:
             if el not in XSF_DATA:
+                logger.error(f"ERROR: XRD form factor data not found for element '{el}' in XSF_DATA")
                 raise ValueError(f"XRD form factor data not found for element '{el}' in XSF_DATA")
-            
+
             # Get data from XSF_DATA
             data = XSF_DATA[el]
             
@@ -202,8 +206,9 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         try:
             return ELEMENTS.index(element)
         except ValueError:
+            logger.error(f"ERROR: Element '{element}' not found in periodic table (Z=1-98)")
             raise ValueError(f"Element '{element}' not found in periodic table (Z=1-98)")
-        
+
     def calc_inelastic(self, atomic_number: int) -> np.ndarray:
         """Calculate inelastic scattering for given atomic number."""
         if self.Szaloki_params is None:
@@ -239,11 +244,11 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
     def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry XRD pattern, or average over all geometries in a directory or trajectory file."""
-        if os.path.isdir(geom_file):
+        if os.path.isdir(geom_file): # getting first geometry from all files in directory
             xyz_files = find_xyz_files(geom_file)
             signals = []
             for f in xyz_files:
-                atoms, coords = read_xyz(f)  #Note: Currently expects single frame files
+                atoms, coords = read_xyz(f) # reading just the first geometry
                 Iat = self.calc_atomic_intensity(atoms)
                 Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
                 Itot = Iat + Imol
@@ -361,6 +366,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         """
         xyz_files = find_xyz_files(xyz_dir)
         if not xyz_files:
+            logger.error(f"ERROR: No XYZ files found in directory: {xyz_dir}")
             raise ValueError(f"No XYZ files found in directory: {xyz_dir}")
         all_Imol = []
         all_Imol0 = []
@@ -401,6 +407,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         mean_Imol = np.nanmean(stacked_Imol, axis=0)
         mean_Imol0 = np.nanmean(np.stack(all_Imol0, axis=0), axis=0)
         if Iat0 is None:
+            logger.error(f"ERROR: No valid trajectories found to compute atomic intensity (Iat0).")
             raise ValueError("No valid trajectories found to compute atomic intensity (Iat0).")
         numerator = (Iat0[:, None] + mean_Imol) - (Iat0[:, None] + mean_Imol0[:, None])
         denominator = (Iat0[:, None] + mean_Imol0[:, None])
@@ -432,8 +439,9 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         self.form_factors = {}
         for el in self.elements:
             if el not in ESF_DATA:
+                logger.error(f"ERROR: UED scattering data not found for element '{el}' in ESF_DATA")
                 raise ValueError(f"UED scattering data not found for element '{el}' in ESF_DATA")
-            
+
             # Get data from ESF_DATA
             data = ESF_DATA[el]
             theta_vals = data[:, 0]  # degrees
@@ -466,6 +474,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         if os.path.isdir(geom_file):
             xyz_files = find_xyz_files(geom_file)
             if not xyz_files:
+                logger.error(f"ERROR: No XYZ files found in directory: {geom_file}")
                 raise ValueError(f'No XYZ files found in directory: {geom_file}')
             signals = []
             pdfs = []
@@ -612,6 +621,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         """
         xyz_files = find_xyz_files(xyz_dir)
         if not xyz_files:
+            logger.error(f"ERROR: No XYZ files found in directory: {xyz_dir}")
             raise ValueError(f"No XYZ files found in directory: {xyz_dir}")
         all_Imol = []
         all_Imol0 = []
