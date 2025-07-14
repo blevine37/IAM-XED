@@ -22,3 +22,4 @@
 - [ ] Handling oscillatory sinc behavior for diff at long distances
 - [ ] Exporting data in other then atomic units
 - [ ] PDF for XRD
+- [ ] Citations should include IAM data sources

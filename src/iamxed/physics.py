@@ -147,7 +147,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
     def load_Szaloki_params(self):
         """Load Szaloki parameters for inelastic scattering."""
         xsf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'XSF')
-        self.Szaloki_params = np.loadtxt(os.path.join(xsf_path, 'Szaloki_params_more.csv'), delimiter=',')
+        self.Szaloki_params = np.loadtxt(os.path.join(xsf_path, 'Szaloki_params_inelastic.csv'), delimiter=',')
         
     def load_form_factors(self):
         """Load XRD form factors from xsf_data_elastic.py."""
