@@ -1,39 +1,39 @@
 test_cases = [
     {
         "dir": "test/H2",
-        "command": "--xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 5.0 --npoints 500 --export xrd_elastic.out --log-to-file --plot",
-        "output": "xrd_elastic.out",
-        "reference": "reference_xrd_elastic.out"
+        "command": "--xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 5.0 --npoints 500 --export xrd_elastic --log-to-file --plot",
+        "output": "xrd_elastic.txt",
+        "reference": "reference_xrd_elastic.txt"
     },
     {
         "dir": "test/H2",
-        "command": "--xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 5.0 --npoints 500 --inelastic --export xrd_inelastic.out --log-to-file --plot",
-        "output": "xrd_inelastic.out",
-        "reference": "reference_xrd_inelastic.out"
+        "command": "--xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 5.0 --npoints 500 --inelastic --export xrd_inelastic --log-to-file --plot",
+        "output": "xrd_inelastic.txt",
+        "reference": "reference_xrd_inelastic.txt"
     },
     {
         "dir": "test/H2",
-        "command": "--ued --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out --log-to-file --plot",
-        "output": "ued.out",
-        "reference": "reference_ued.out"
+        "command": "--ued --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued --log-to-file --plot",
+        "output": "ued.txt",
+        "reference": "reference_ued.txt"
     },
     {
         "dir": "test/CF3I",
-        "command": "--ued --calculation-type static --signal-geoms CF3I.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --plot-units angstrom-1 --export ued.out --log-to-file --plot", #currently exporting in atomic units
-        "output": "ued.out",
-        "reference": "reference_ued.out"
+        "command": "--ued --calculation-type static --signal-geoms CF3I.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --plot-units angstrom-1 --export ued --log-to-file --plot", #currently exporting in atomic units
+        "output": "ued.txt",
+        "reference": "reference_ued.txt"
     },
     {
         "dir": "test/cyclobutanone",
-        "command": "--ued --calculation-type static --signal-geoms c2.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export ued_diff.out --log-to-file --plot",
-	    "output": "ued_diff.out",
-        "reference": "reference_ued_diff.out"
+        "command": "--ued --calculation-type static --signal-geoms c2.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export ued_diff --log-to-file --plot",
+	    "output": "ued_diff.txt",
+        "reference": "reference_ued_diff.txt"
     },
     {
         "dir": "test/cyclobutanone",
-        "command": "--xrd --calculation-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export xrd_diff.out --log-to-file --plot",
-	    "output": "xrd_diff.out",
-        "reference": "reference_xrd_diff.out"
+        "command": "--xrd --calculation-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export xrd_diff --log-to-file --plot",
+	    "output": "xrd_diff.txt",
+        "reference": "reference_xrd_diff.txt"
     },
     {
         "dir": "test/cyclobutanone",

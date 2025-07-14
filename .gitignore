@@ -4,3 +4,10 @@ test/__pycache__/
 .idea/
 *out
 *npz
+/test/CF3I/ued.txt
+/test/H2/ued.txt
+/test/cyclobutanone/ued_diff.txt
+/test/H2/xrd_elastic.txt
+/test/H2/xrd_inelastic.txt
+*diff.txt
+*PDF.txt
