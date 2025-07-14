@@ -33,8 +33,11 @@ def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logg
     
     return logger
 
+
 def read_xyz(filename: str) -> Tuple[List[str], np.ndarray]:
     """Read a single geometry from an XYZ file."""
+    from .physics import ANG_TO_BH
+
     atoms = []
     coordinates = []
     with open(filename) as xyz:
@@ -43,17 +46,23 @@ def read_xyz(filename: str) -> Tuple[List[str], np.ndarray]:
         for line in xyz:
             if len(line.strip()) == 0:
                 break
-            atom, x, y, z = line.split()
-            atoms.append(atom)
-            coordinates.append([float(x), float(y), float(z)])
-    coordinates = [[w * 1.88973 for w in ww] for ww in coordinates]
+            try:
+                atom, x, y, z = line.split()
+                atoms.append(atom)
+                coordinates.append([float(x), float(y), float(z)])
+            except ValueError as e:
+                raise ValueError(f"Invalid line format in XYZ file ({filename}): {line.strip()}") from e
+    coordinates = [[w * ANG_TO_BH for w in ww] for ww in coordinates]
     coordinates = np.asarray(coordinates)
     if n_atoms != len(coordinates):
         raise ValueError('Number of atoms in xyz file does not match the number of lines.')
     return atoms, coordinates
 
+
 def read_xyz_trajectory(filename: str) -> Tuple[List[str], np.ndarray]:
     """Read multiple geometries from an XYZ trajectory file."""
+    from .physics import ANG_TO_BH
+
     atoms: List[str] = []
     trajectory = []
     with open(filename, 'r') as f:
@@ -66,29 +75,39 @@ def read_xyz_trajectory(filename: str) -> Tuple[List[str], np.ndarray]:
                 n_atoms = int(line.strip())
             except ValueError:
                 raise ValueError(f"Expected number of atoms at start of frame, got: {line}")
-            _ = f.readline()
+            _ = f.readline() # Skip comment line
             frame_atoms = []
             frame_coords = []
             for _ in range(n_atoms):
                 parts = f.readline().split()
                 if len(parts) != 4:
                     raise ValueError(f"Invalid atom line: {parts}")
-                atom, x, y, z = parts
-                frame_atoms.append(atom)
-                frame_coords.append([float(x), float(y), float(z)])
+                try:
+                    atom, x, y, z = parts
+                    frame_atoms.append(atom)
+                    frame_coords.append([float(x), float(y), float(z)])
+                except ValueError as e:
+                    raise ValueError(f"Invalid coordinate values in atom line: {parts}") from e
             if first_frame:
                 atoms = frame_atoms
                 first_frame = False
             elif atoms != frame_atoms:
                 raise ValueError("Atom labels don't match across frames.")
-            frame_coords = [[w * 1.88973 for w in xyz] for xyz in frame_coords]
+            frame_coords = [[w * ANG_TO_BH for w in xyz] for xyz in frame_coords]
             trajectory.append(frame_coords)
     coordinates = np.array(trajectory)
     return atoms, coordinates
 
+
 def find_xyz_files(directory: str) -> List[str]:
     """Find all XYZ files in a directory."""
-    return sorted([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.xyz')])
+    xyz_files = sorted([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.xyz')])
+
+    if not xyz_files:
+        raise FileNotFoundError('No XYZ files found in directory.')
+
+    return xyz_files
+
 
 def is_trajectory_file(filename: str) -> bool:
     """Check if an XYZ file contains multiple frames."""
@@ -111,6 +130,7 @@ def is_trajectory_file(filename: str) -> bool:
     except (ValueError, IOError):
         return False
 
+
 def get_elements_from_input(signal_geoms: str) -> List[str]:
     """Get unique elements from input geometries.
     
@@ -129,8 +149,6 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
         elements.update(atoms)
     elif os.path.isdir(signal_geoms):
         xyz_files = find_xyz_files(signal_geoms)
-        if not xyz_files:
-            raise FileNotFoundError('No XYZ files found in directory.')
         # Check if first file is a trajectory
         if is_trajectory_file(xyz_files[0]):
             atoms, _ = read_xyz_trajectory(xyz_files[0])
@@ -139,7 +157,7 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
         elements.update(atoms)
     else:
         raise FileNotFoundError('Signal geometry file not found.')
-    return sorted(set(elements))
+    return sorted(elements)
 
 
 def parse_cmd_args():
@@ -204,16 +222,16 @@ def parse_cmd_args():
     
     # General options
     general_sec = parser.add_argument_group("General options")
-    general_sec.add_argument('--signal-geoms', type=validate_path, required=True,
-                           help='Geometries for calculating signal (xyz file or directory containing set of xyz trajectory files).')
-    general_sec.add_argument('--reference-geoms', type=validate_path,
-                           help='OPTIONAL: Reference geometries for difference calculation (xyz file). If no reference '
-                                'for time resolved calculation is provided, the first frame of the signal geometries '
-                                'will be used as reference.')
     general_sec.add_argument('--calculation-type', type=str, choices=['static', 'time-resolved'], default='static',
         help='Either perform static or time-resolved calculation. Static calculation averages signal from all geometries provided. '
              'Time-resolved calculation will treat xyz files as trajectories and will average the signal only within time frames. '
              'Default: static.')
+    general_sec.add_argument('--signal-geoms', type=validate_path, required=True,
+                           help='Geometries for calculating signal (xyz file or directory containing set of xyz trajectory files).')
+    general_sec.add_argument('--reference-geoms', type=validate_path,
+                           help='OPTIONAL: Reference geometries for difference calculation (xyz file or directory containing '
+                                'xyz files with a single geomtry). If no reference for time resolved calculation is provided, '
+                                'the first frame of the signal geometries will be used as reference.')
     
     # Signal type options
     signal_sec = parser.add_argument_group("Signal type options")
