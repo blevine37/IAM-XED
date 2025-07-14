@@ -182,8 +182,25 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         
     def get_atomic_number(self, element: str) -> int:
         """Get atomic number for element."""
-        periodic = {'H': 1, 'C': 6, 'O': 8, 'F': 9, 'S': 16}
-        return periodic[element]
+        # Atomic number (1-based) to element symbol mapping for Z=1-98
+        ELEMENTS = [
+            None,  # 0-index placeholder
+            'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+            'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
+            'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+            'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr',
+            'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn',
+            'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd',
+            'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb',
+            'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg',
+            'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th',
+            'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf'
+        ]
+        
+        try:
+            return ELEMENTS.index(element)
+        except ValueError:
+            raise ValueError(f"Element '{element}' not found in periodic table (Z=1-98)")
         
     def calc_inelastic(self, atomic_number: int) -> np.ndarray:
         """Calculate inelastic scattering for given atomic number."""
