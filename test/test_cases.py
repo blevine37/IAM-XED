@@ -1,61 +1,61 @@
 test_cases = [
     {
         "dir": "test/H2",
-        "command": "--xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 5.0 --npoints 500 --export xrd_elastic.out",
+        "command": "--xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 5.0 --npoints 500 --export xrd_elastic.out --log-to-file --plot",
         "output": "xrd_elastic.out",
         "reference": "reference_xrd_elastic.out"
     },
     {
         "dir": "test/H2",
-        "command": "--xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 5.0 --npoints 500 --inelastic --export xrd_inelastic.out",
+        "command": "--xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 5.0 --npoints 500 --inelastic --export xrd_inelastic.out --log-to-file --plot",
         "output": "xrd_inelastic.out",
         "reference": "reference_xrd_inelastic.out"
     },
     {
         "dir": "test/H2",
-        "command": "--ued --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out",
+        "command": "--ued --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out --log-to-file --plot",
         "output": "ued.out",
         "reference": "reference_ued.out"
     },
     {
         "dir": "test/CF3I",
-        "command": "--ued --calculation-type static --signal-geoms CF3I.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --plot-units angstrom-1 --export ued.out", #currently exporting in atomic units
+        "command": "--ued --calculation-type static --signal-geoms CF3I.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --plot-units angstrom-1 --export ued.out --log-to-file --plot", #currently exporting in atomic units
         "output": "ued.out",
         "reference": "reference_ued.out"
     },
     {
         "dir": "test/cyclobutanone",
-        "command": "--ued --calculation-type static --signal-geoms c2.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export ued_diff.out", 
-	"output": "ued_diff.out",
+        "command": "--ued --calculation-type static --signal-geoms c2.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export ued_diff.out --log-to-file --plot",
+	    "output": "ued_diff.out",
         "reference": "reference_ued_diff.out"
     },
     {
         "dir": "test/cyclobutanone",
-        "command": "--xrd --calculation-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export xrd_diff.out", 
+        "command": "--xrd --calculation-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --export xrd_diff.out --log-to-file --plot",
 	    "output": "xrd_diff.out",
         "reference": "reference_xrd_diff.out"
     },
     {
         "dir": "test/cyclobutanone",
-        "command": "--ued  --signal-geoms cycbut_traj.xyz  --calculation-type time-resolved --qmin 0.0 --qmax 5.29 --npoints 53 --pdf-alpha 0.02 --timestep 40 --export ued_traj", 
+        "command": "--ued  --signal-geoms cycbut_traj.xyz  --calculation-type time-resolved --qmin 0.0 --qmax 5.29 --npoints 53 --pdf-alpha 0.02 --timestep 40 --export ued_traj --log-to-file --plot",
 	    "output": "ued_traj.npz",
         "reference": "reference_ued_traj.npz"
     },
     {
         "dir": "test/cyclobutanone",
-        "command": "--xrd  --signal-geoms cycbut_traj.xyz  --calculation-type time-resolved --qmin 0.0 --qmax 5.29 --npoints 100 --timestep 40 --inelastic --export xrd_traj", 
+        "command": "--xrd  --signal-geoms cycbut_traj.xyz  --calculation-type time-resolved --qmin 0.0 --qmax 5.29 --npoints 100 --timestep 40 --inelastic --export xrd_traj --log-to-file --plot",
 	    "output": "xrd_traj.npz",
         "reference": "reference_xrd_traj.npz"
     },
     {
         "dir": "test/cyclobutanone",
-        "command": "--ued --signal-geoms ./ensemble/ --calculation-type time-resolved --qmin 0 --qmax 4 --npoints 100 --timestep 40.0 --export ued_ensemble",
+        "command": "--ued --signal-geoms ./ensemble/ --calculation-type time-resolved --qmin 0 --qmax 4 --npoints 100 --timestep 40.0 --export ued_ensemble --log-to-file --plot",
 	    "output": "ued_ensemble.npz",
         "reference": "reference_ued_ensemble.npz"
     },
     {
         "dir": "test/cyclobutanone",
-        "command": "--xrd --signal-geoms ./ensemble/ --calculation-type time-resolved --qmin 0 --qmax 4 --npoints 100 --timestep 40.0  --inelastic --export xrd_ensemble",
+        "command": "--xrd --signal-geoms ./ensemble/ --calculation-type time-resolved --qmin 0 --qmax 4 --npoints 100 --timestep 40.0  --inelastic --export xrd_ensemble --log-to-file --plot",
 	    "output": "xrd_ensemble.npz",
         "reference": "reference_xrd_ensemble.npz"
     },
