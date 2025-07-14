@@ -15,6 +15,7 @@ except ImportError:
         return iterable
 
 from .io_utils import read_xyz, read_xyz_trajectory, find_xyz_files, is_trajectory_file
+from .XSF.xsf_data_elastic import XSF_DATA
 
 # Physical constants
 ANG_TO_BH = 1.8897259886
@@ -127,7 +128,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
     """Calculate XRD patterns using IAM approximation."""
     
     def __init__(self, q_start: float, q_end: float, num_point: int, elements: List[str], 
-                 inelastic: bool = False, xsf_dir: str = 'XSF'):
+                 inelastic: bool = False):
         """Initialize XRD calculator.
         
         Args:
@@ -136,31 +137,34 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             num_point: Number of q points
             elements: List of elements to load form factors for
             inelastic: Whether to include inelastic scattering
-            xsf_dir: Directory containing XSF files for form factors
         """
         super().__init__(q_start, q_end, num_point, elements)
         self.inelastic = inelastic
-        self.xsf_dir = xsf_dir
         self.Szaloki_params = {}
         if inelastic:
             self.load_Szaloki_params()
             
     def load_Szaloki_params(self):
         """Load Szaloki parameters for inelastic scattering."""
-        xsf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.xsf_dir)
+        xsf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'XSF')
         self.Szaloki_params = np.loadtxt(os.path.join(xsf_path, 'Szaloki_params_more.csv'), delimiter=',')
         
     def load_form_factors(self):
-        """Load XRD form factors."""
-        xsf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.xsf_dir)
+        """Load XRD form factors from xsf_data_elastic.py."""
         self.form_factors = {}
         for el in self.elements:
-            file = os.path.join(xsf_path, el)
-            if not os.path.exists(file):
-                raise ValueError(f"XRD form factor data not found for element '{el}' at {file}")
-            data = np.loadtxt(file)
-            data[:, 0] = data[:, 0] / ANG_TO_BH * S_TO_Q
-            f = interp1d(data[:, 0], data[:, 1], kind='cubic', bounds_error=False, fill_value=0)
+            if el not in XSF_DATA:
+                raise ValueError(f"XRD form factor data not found for element '{el}' in XSF_DATA")
+            
+            # Get data from XSF_DATA
+            data = XSF_DATA[el]
+            
+            # Convert units: sin(theta)/lambda in Ang^-1 to q in atomic units
+            q_vals = data[:, 0] * S_TO_Q / ANG_TO_BH
+            f_vals = data[:, 1]
+            
+            # Create interpolation function
+            f = interp1d(q_vals, f_vals, kind='cubic', bounds_error=False, fill_value=0)
             self.form_factors[el] = f(self.qfit)  # XRD form factors are real
         
     def calc_atomic_intensity(self, atoms: List[str]) -> np.ndarray:

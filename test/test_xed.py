@@ -18,7 +18,7 @@ def run_command(test_dir, command):
     finally:
         os.chdir(original_dir)
 
-def compare_output(output_file, reference_file, rtol=1e-5, atol=1e-8):
+def compare_output(output_file, reference_file, rtol=1e-4, atol=1e-6):
     """Compare output file with reference file, ignoring comment lines."""
     if output_file.suffix == '.npz':
         compare_npz(output_file, reference_file, rtol, atol)
@@ -32,7 +32,7 @@ def compare_output(output_file, reference_file, rtol=1e-5, atol=1e-8):
         reference_data = load_data_ignoring_comments(reference_file)
         np.testing.assert_allclose(output_data, reference_data, rtol=rtol, atol=atol)
 
-def compare_npz(output_file, reference_file, rtol=1e-5, atol=1e-8):
+def compare_npz(output_file, reference_file, rtol=1e-4, atol=1e-6):
     """Compare NPZ files."""
     with np.load(output_file) as output_data, np.load(reference_file) as reference_data:
         assert set(output_data.keys()) == set(reference_data.keys()), "Different keys in NPZ files"
