@@ -2,3 +2,5 @@ __pycache__/
 test/__pycache__/
 .DS_Store
 .idea/
+*out
+*npz

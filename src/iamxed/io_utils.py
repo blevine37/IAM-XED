@@ -6,8 +6,7 @@ import numpy as np
 import logging
 import argparse
 import os
-import sys
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logger:
     """Set up the logger for output messages."""
@@ -142,86 +141,129 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
         raise FileNotFoundError('Signal geometry file not found.')
     return sorted(set(elements))
 
-def validate_path(path: str) -> str:
-    """Validate that a path exists and is either a file or directory.
-    """
-    if not os.path.exists(path):
-        raise argparse.ArgumentTypeError(f"Path does not exist: {path}")
-    if not os.path.isfile(path) and not os.path.isdir(path):
-        raise argparse.ArgumentTypeError(f"Path is neither a file nor a directory: {path}")
-    return path
 
-def parse_cmd_args(args: Optional[List[str]] = None):
+def parse_cmd_args():
     """Parse command line arguments.
-    
-    Args:
-        args: Optional list of command line arguments. If None, uses sys.argv[1:]
+    Returns:
+        Parsed arguments as a Namespace object.
     """
-    parser = argparse.ArgumentParser(description='X-ray and Electron Diffraction (XED) Calculation Script')
+    ### functions used within the function
+    def validate_path(path: str) -> str:
+        """Validate that a path exists and is either a file or directory.
+        """
+        if not os.path.exists(path):
+            raise argparse.ArgumentTypeError(f"Path does not exist: {path}")
+        if not os.path.isfile(path) and not os.path.isdir(path):
+            raise argparse.ArgumentTypeError(f"Path is neither a file nor a directory: {path}")
+        return path
+
+    def positive_int(str_value: str) -> int:
+        """Convert a string into a positive integer.
+
+        This is a helper type conversion function for user input type checking by argparse, see:
+        https://docs.python.org/3/library/argparse.html#type
+
+        raises: ValueError if string is not a positive integer
+        """
+        val = int(str_value)
+        if val <= 0:
+            raise argparse.ArgumentTypeError(f"'{val}' is not a positive integer")
+        return val
+
+    def positive_float(str_value: str) -> float:
+        """Convert a string into a positive float.
+
+        This is a helper type conversion function for user input type checking by argparse, see:
+        https://docs.python.org/3/library/argparse.html#type
+
+        raises: ValueError if string is not a positive real number
+        """
+
+        val = float(str_value)
+        if val <= 0:
+            raise argparse.ArgumentTypeError(f"'{val}' is not a positive real number")
+        return val
+
+    def nonnegative_float(str_value: str) -> float:
+        """Convert a string into a positive float.
+
+        This is a helper type conversion function for user input type checking by argparse, see:
+        https://docs.python.org/3/library/argparse.html#type
+
+        raises: ValueError if string is not a positive real number
+        """
+
+        val = float(str_value)
+        if val < 0:
+            raise argparse.ArgumentTypeError(f"'{val}' is not a positive real number")
+        return val
+
+    ### parse arguments
+    parser = argparse.ArgumentParser(description='Independent Atom Model code for X-ray and ultrafast Electron Diffraction. '
+                                                 'Copyright (c) 2025 Suchan J., Janos J.')
     
     # General options
     general_sec = parser.add_argument_group("General options")
     general_sec.add_argument('--signal-geoms', type=validate_path, required=True,
-                           help='Geometries for calculating signal (xyz file or directory)')
+                           help='Geometries for calculating signal (xyz file or directory containing set of xyz trajectory files).')
     general_sec.add_argument('--reference-geoms', type=validate_path,
-                           help='Reference geometries for difference calculation')
+                           help='OPTIONAL: Reference geometries for difference calculation (xyz file). If no reference '
+                                'for time resolved calculation is provided, the first frame of the signal geometries '
+                                'will be used as reference.')
     general_sec.add_argument('--calculation-type', type=str, choices=['static', 'time-resolved'], default='static',
-        help='Either perform static (average/ensemble) or time-resolved (2D map) calculation.')
+        help='Either perform static or time-resolved calculation. Static calculation averages signal from all geometries provided. '
+             'Time-resolved calculation will treat xyz files as trajectories and will average the signal only within time frames. '
+             'Default: static.')
     
     # Signal type options
     signal_sec = parser.add_argument_group("Signal type options")
     signal_type = signal_sec.add_mutually_exclusive_group(required=True)
     signal_type.add_argument('--ued', action='store_true',
-                           help='Performs UED calculation')
+                           help='Performs UED calculation.')
     signal_type.add_argument('--xrd', action='store_true',
-                           help='Performs XRD calculation')
+                           help='Performs XRD calculation.')
     signal_sec.add_argument('--inelastic', action='store_true',
-                           help='Include inelastic atomic contribution for XRD')
+                           help='Include inelastic atomic contribution for XRD.')
     
     # Time-resolved options
     time_sec = parser.add_argument_group("Time-resolved options")
-    time_sec.add_argument('--timestep', type=float, default=10.0,
-                       help='Timestep between frames (atomic units)')
-    time_sec.add_argument('--tmax', type=float,
-                       help='Maximum time to calculate up to (femtoseconds)')
+    time_sec.add_argument('--timestep', type=positive_float, default=10.0,
+                       help='Timestep between frames in trajectories for time-resolved calculation (atomic time units).')
+    time_sec.add_argument('--tmax', type=positive_float,
+                       help='Maximum time to calculate time-resolved signal up to (femtoseconds).')
 
     # Processing options
-    proc_sec = parser.add_argument_group("Processing options")
-    proc_sec.add_argument('--fwhm', type=float, default=150.0,
-                         help='FWHM for temporal Gaussian smoothing (fs)')
-    proc_sec.add_argument('--pdf-alpha', type=float, default=0.04,
-                         help='Damping parameter for PDF Fourier transform (Ang^2)')
+    proc_sec = parser.add_argument_group("Signal processing options")
+    proc_sec.add_argument('--fwhm', type=positive_float, default=150.0,
+                         help='Full Width at Half Maximum for temporal Gaussian smoothing of time-resolved signal. (fs)')
+    proc_sec.add_argument('--pdf-alpha', type=positive_float, default=0.04,
+                         help='Gaussian damping parameter for PDF Fourier transform (Ang^2)')
     
     # Output options
     out_sec = parser.add_argument_group("Output options")
     out_sec.add_argument('--log-to-file', action='store_true',
-                        help="Save output to 'xed.out'")
+                        help="Save output to 'xed.out' or 'ued.out' file.")
     out_sec.add_argument('--debug', action='store_true',
-                        help="Print debug output")
+                        help="Print debug output.")
     out_sec.add_argument('--plot', action='store_true',
                         help='Plot the results')
     out_sec.add_argument('--plot-flip', action='store_true',
-                        help='Flip x and y axes in all plots')
+                        help='Flip x and y axes in all plot.s')
     out_sec.add_argument('--export', type=str,
-                        help='Export calculated data to file')
+                        help='Export calculated data to file.')
     out_sec.add_argument('--plot-units', type=str, default='bohr-1', choices=['bohr-1', 'angstrom-1'],
-                        help="Units for plotting the q axis: 'bohr-1' (default) or 'angstrom-1'")
+                        help="Units for plotting the q axis: 'bohr-1' (default) or 'angstrom-1'.")
     
     # Grid parameters
     grid_sec = parser.add_argument_group("Grid parameters")
-    grid_sec.add_argument('--qmin', type=float, default=5.29e-9,
-                         help='Minimum q value (Bohr^-1)')
-    grid_sec.add_argument('--qmax', type=float, default=5.29,
-                         help='Maximum q value (Bohr^-1)')
-    grid_sec.add_argument('--npoints', type=int, default=200,
-                         help='Number of q points')
+    grid_sec.add_argument('--qmin', type=nonnegative_float, default=5.29e-9,
+                         help='Minimum q value (Bohr^-1).')
+    grid_sec.add_argument('--qmax', type=positive_float, default=5.29,
+                         help='Maximum q value (Bohr^-1).')
+    grid_sec.add_argument('--npoints', type=positive_int, default=200,
+                         help='Number of q points.')
     
     # Parse arguments
-    parsed_args = parser.parse_args(args)
-    
-    # If help was requested, show help and exit immediately
-    if '--help' in (args or sys.argv[1:]):
-        parser.print_help()
-        sys.exit(0)
-    
+    parsed_args = parser.parse_args()
+
     return parsed_args 
