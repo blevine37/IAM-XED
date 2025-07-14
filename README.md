@@ -62,7 +62,35 @@ iamxed --ued --signal-geoms trajectory.xyz --calculation-type time-resolved
 - `--export`: Export calculated data to file
 - `--qmin`, `--qmax`, `--npoints`: Control q-grid parameters
 
-## File Structure
+### Calling IAM-XED from Python
+You can also use IAM-XED as a library in your Python code. Here is an example of how to use it:
+
+```python
+from iamxed import iamxed
+from argparse import Namespace
+
+params = {
+    "signal_geoms": "./ensemble/",
+    "reference_geoms": None,
+    "calculation_type": "time-resolved",
+    "ued": False,
+    "xrd": True,
+    "inelastic": True,
+    "qmin": 0,
+    "qmax": 4,
+    "npoints": 100,
+    "timestep": 40.0,
+    "export": "xrd_ensemble",
+    "log_to_file": False,
+    "debug": True,
+}
+
+params = Namespace(**params)
+
+iamxed(params)
+```
+
+## Code Structure
 The package is located in the `src/iamxed` directory and contains the following files:
 - `xed.py`: Main entry point and CLI
 - `physics.py`: Core physics calculations and calculator classes
