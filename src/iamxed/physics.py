@@ -53,12 +53,8 @@ class BaseDiffractionCalculator(ABC):
                     continue
                 r_ij = np.linalg.norm(i_p - j_p)
                 qr = self.qfit * r_ij
-                sinc_term = np.sinc(qr / np.pi)
-                if isinstance(self, UEDDiffractionCalculator):
-                    # For UED, keep complex conjugate for proper phase handling
-                    Imol += np.conjugate(i_aaf) * j_aaf * sinc_term
-                else:
-                    Imol += i_aaf * j_aaf * sinc_term
+                sinc_term = np.sinc(qr / np.pi) # todo: why divided by pi?
+                Imol += np.conjugate(i_aaf) * j_aaf * sinc_term # np.conjugate is used for UED to handle complex form factors but does not affect floats in XRD
         return Imol
 
     @staticmethod
@@ -257,9 +253,9 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             return self.qfit, avg_signal, None, None
         elif is_trajectory_file(geom_file):
             atoms, trajectory = read_xyz_trajectory(geom_file)
+            Iat = self.calc_atomic_intensity(atoms) # Calculate atomic intensity once for all frames (they don't depend on coordinates)
             signals = []
             for coords in trajectory:
-                Iat = self.calc_atomic_intensity(atoms)
                 Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
                 Itot = Iat + Imol
                 signals.append(Itot)
