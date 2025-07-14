@@ -5,20 +5,32 @@ Handles command line interface and orchestrates calculations.
 """
 import numpy as np
 import os
+from argparse import Namespace
 
 from .io_utils import parse_cmd_args, output_logger, get_elements_from_input
 from .physics import XRDDiffractionCalculator, UEDDiffractionCalculator
 from .plotting import plot_static, plot_time_resolved, plot_time_resolved_pdf
 
+
 def main():
-    global logger
+    """main() function that contains argument parsing and the main iamxed calculation. It's purpose is to have argument
+    parsing and the consecutive calculation separated such that iamxed can be called in python scripts with the input
+    provided as args Namespace."""
 
-    from sys import argv
-
-    """Main function for x-ray and electron diffraction calculations."""
     # Parse command line arguments
     args = parse_cmd_args()
-    
+
+    iamxed(args)
+
+def iamxed(args: Namespace):
+    global logger
+    from sys import argv
+
+    """IAMXED function for x-ray and electron diffraction calculations."""
+    # check that args are Namespace in case iamxed is called from python script
+    if not isinstance(args, Namespace):
+        raise TypeError("Expected args for iamxed() to be a Namespace object.")
+
     # Set up logger
     logger = output_logger(args.log_to_file, args.debug)
 
