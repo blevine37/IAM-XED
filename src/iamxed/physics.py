@@ -142,6 +142,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         super().__init__(q_start, q_end, num_point, elements) # initialize base class
         self.inelastic = inelastic
         self.Szaloki_params = {}
+        self.load_form_factors()
         if inelastic:
             self.load_Szaloki_params()
             
@@ -243,8 +244,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             signals = []
             for f in xyz_files:
                 atoms, coords = read_xyz(f)  #Note: Currently expects single frame files
-                if not self.form_factors:
-                    self.load_form_factors()
                 Iat = self.calc_atomic_intensity(atoms)
                 Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
                 Itot = Iat + Imol
@@ -253,8 +252,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             return self.qfit, avg_signal, None, None
         elif is_trajectory_file(geom_file):
             atoms, trajectory = read_xyz_trajectory(geom_file)
-            if not self.form_factors:
-                self.load_form_factors()
             signals = []
             for coords in trajectory:
                 Iat = self.calc_atomic_intensity(atoms)
@@ -265,8 +262,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             return self.qfit, avg_signal, None, None
         else:
             atoms, coords = read_xyz(geom_file)
-            if not self.form_factors:
-                self.load_form_factors()
             Iat = self.calc_atomic_intensity(atoms)
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
             Itot = Iat + Imol
@@ -308,8 +303,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             pdfs_smooth: Gaussian smoothed PDFs (dummy for XRD)
         """
         atoms, trajectory = read_xyz_trajectory(trajfile)
-        if not self.form_factors:
-            self.load_form_factors()
             
         # Calculate reference (t=0) intensities
         Iat0 = self.calc_atomic_intensity(atoms)
@@ -376,8 +369,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         Iat0 = None
         for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Ensemble files')):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
-            if not self.form_factors:
-                self.load_form_factors()
             if Iat0 is None:
                 Iat0 = self.calc_atomic_intensity(atoms)
             Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
@@ -433,6 +424,8 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         self.ued_energy_ev = ued_energy_ev
         self.elekin_ha = ued_energy_ev / 27.2114
         self.k = (self.elekin_ha * (self.elekin_ha + 2 * 137 ** 2)) ** 0.5 / 137 # getting relativistic electron wave vector
+        self.load_form_factors()
+
         
     def load_form_factors(self):
         """Load UED form factors from esf_data.py."""
@@ -478,8 +471,6 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             pdfs = []
             for f in xyz_files:
                 atoms, coords = read_xyz(f) #Note: Currently expects single frame files
-                if not self.form_factors:
-                    self.load_form_factors()
                 Iat = self.calc_atomic_intensity(atoms)
                 Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
                 sm = self.qfit * (Imol / Iat)
@@ -495,8 +486,6 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             return self.qfit, avg_signal, r, avg_pdf
         elif is_trajectory_file(geom_file):
             atoms, trajectory = read_xyz_trajectory(geom_file)
-            if not self.form_factors:
-                self.load_form_factors()
             signals = []
             pdfs = []
             Iat = self.calc_atomic_intensity(atoms)
@@ -516,8 +505,6 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             return self.qfit, avg_signal, r, avg_pdf
         else:
             atoms, coords = read_xyz(geom_file)
-            if not self.form_factors:
-                self.load_form_factors()
             Iat = self.calc_atomic_intensity(atoms)
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
             sm = self.qfit * (Imol / Iat)
@@ -567,8 +554,6 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             pdfs_smooth: Gaussian smoothed PDFs
         """
         atoms, trajectory = read_xyz_trajectory(trajfile)
-        if not self.form_factors:
-            self.load_form_factors()
         Iat = self.calc_atomic_intensity(atoms)
         sm0 = self.qfit * (self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0]) / Iat)
         sm0 = np.real(sm0)
@@ -640,8 +625,6 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         all_s = []  # Will hold s_k(t) for each trajectory
         for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Ensemble files')):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
-            if not self.form_factors:
-                self.load_form_factors()
             if Iat0 is None:
                 Iat0 = self.calc_atomic_intensity(atoms)
             s_traj = []
