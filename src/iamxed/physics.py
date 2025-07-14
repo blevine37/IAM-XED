@@ -15,6 +15,8 @@ except ImportError:
         return iterable
 
 from .io_utils import read_xyz, read_xyz_trajectory, find_xyz_files, is_trajectory_file
+from .XSF.xsf_data_elastic import XSF_DATA
+from .ESF.esf_data import ESF_DATA
 
 # Physical constants
 ANG_TO_BH = 1.8897259886
@@ -127,7 +129,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
     """Calculate XRD patterns using IAM approximation."""
     
     def __init__(self, q_start: float, q_end: float, num_point: int, elements: List[str], 
-                 inelastic: bool = False, xsf_dir: str = 'XSF'):
+                 inelastic: bool = False):
         """Initialize XRD calculator.
         
         Args:
@@ -136,31 +138,34 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             num_point: Number of q points
             elements: List of elements to load form factors for
             inelastic: Whether to include inelastic scattering
-            xsf_dir: Directory containing XSF files for form factors
         """
         super().__init__(q_start, q_end, num_point, elements)
         self.inelastic = inelastic
-        self.xsf_dir = xsf_dir
         self.Szaloki_params = {}
         if inelastic:
             self.load_Szaloki_params()
             
     def load_Szaloki_params(self):
         """Load Szaloki parameters for inelastic scattering."""
-        xsf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.xsf_dir)
-        self.Szaloki_params = np.loadtxt(os.path.join(xsf_path, 'Szaloki_params_more.csv'), delimiter=',')
+        xsf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'XSF')
+        self.Szaloki_params = np.loadtxt(os.path.join(xsf_path, 'Szaloki_params_inelastic.csv'), delimiter=',')
         
     def load_form_factors(self):
-        """Load XRD form factors."""
-        xsf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.xsf_dir)
+        """Load XRD form factors from xsf_data_elastic.py."""
         self.form_factors = {}
         for el in self.elements:
-            file = os.path.join(xsf_path, el)
-            if not os.path.exists(file):
-                raise ValueError(f"XRD form factor data not found for element '{el}' at {file}")
-            data = np.loadtxt(file)
-            data[:, 0] = data[:, 0] / ANG_TO_BH * S_TO_Q
-            f = interp1d(data[:, 0], data[:, 1], kind='cubic', bounds_error=False, fill_value=0)
+            if el not in XSF_DATA:
+                raise ValueError(f"XRD form factor data not found for element '{el}' in XSF_DATA")
+            
+            # Get data from XSF_DATA
+            data = XSF_DATA[el]
+            
+            # Convert units: sin(theta)/lambda in Ang^-1 to q in atomic units
+            q_vals = data[:, 0] * S_TO_Q / ANG_TO_BH
+            f_vals = data[:, 1]
+            
+            # Create interpolation function
+            f = interp1d(q_vals, f_vals, kind='cubic', bounds_error=False, fill_value=0)
             self.form_factors[el] = f(self.qfit)  # XRD form factors are real
         
     def calc_atomic_intensity(self, atoms: List[str]) -> np.ndarray:
@@ -178,8 +183,25 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         
     def get_atomic_number(self, element: str) -> int:
         """Get atomic number for element."""
-        periodic = {'H': 1, 'C': 6, 'O': 8, 'F': 9, 'S': 16}
-        return periodic[element]
+        # Atomic number (1-based) to element symbol mapping for Z=1-98
+        ELEMENTS = [
+            None,  # 0-index placeholder
+            'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+            'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
+            'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+            'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr',
+            'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn',
+            'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd',
+            'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb',
+            'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg',
+            'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th',
+            'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf'
+        ]
+        
+        try:
+            return ELEMENTS.index(element)
+        except ValueError:
+            raise ValueError(f"Element '{element}' not found in periodic table (Z=1-98)")
         
     def calc_inelastic(self, atomic_number: int) -> np.ndarray:
         """Calculate inelastic scattering for given atomic number."""
@@ -416,36 +438,25 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         self.k = (self.elekin_ha * (self.elekin_ha + 2 * 137 ** 2)) ** 0.5 / 137
         
     def load_form_factors(self):
-        """Load UED form factors."""
+        """Load UED form factors from esf_data.py."""
         self.form_factors = {}
         for el in self.elements:
-            scatamp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ESF', f'{el}full', 'scatamp.dat')
-            if not os.path.exists(scatamp_path):
-                raise ValueError(f"UED scattering data not found for element '{el}' at {scatamp_path}")
-                
-            data = []
-            with open(scatamp_path) as f:
-                for line in f:
-                    if line.strip().startswith('#') or line.strip() == '' or line.startswith('---'):
-                        continue
-                    parts = line.split()
-                    if len(parts) < 4:
-                        continue
-                    angle = float(parts[0])
-                    reF = float(parts[2]) * CM_TO_BOHR
-                    imF = float(parts[3]) * CM_TO_BOHR
-                    data.append([angle, reF, imF])
-                    
-            data = np.array(data)
+            if el not in ESF_DATA:
+                raise ValueError(f"UED scattering data not found for element '{el}' in ESF_DATA")
+            
+            # Get data from ESF_DATA
+            data = ESF_DATA[el]
             theta_vals = data[:, 0]  # degrees
+            reF_vals = data[:, 1] * CM_TO_BOHR  # Convert cm to bohr
+            imF_vals = data[:, 2] * CM_TO_BOHR  # Convert cm to bohr
             
             # Convert q to theta for interpolation
             with np.errstate(invalid='ignore'):
                 thetafit = 2 * np.arcsin(np.clip(self.qfit / (2 * self.k), -1, 1)) * 180 / np.pi
                 
             # Interpolate real and imag parts
-            fre = interp1d(theta_vals, data[:, 1], kind='cubic', bounds_error=False, fill_value=0)
-            fim = interp1d(theta_vals, data[:, 2], kind='cubic', bounds_error=False, fill_value=0)
+            fre = interp1d(theta_vals, reF_vals, kind='cubic', bounds_error=False, fill_value=0)
+            fim = interp1d(theta_vals, imF_vals, kind='cubic', bounds_error=False, fill_value=0)
             yre = fre(thetafit)
             yim = fim(thetafit)
             self.form_factors[el] = yre + 1j * yim  # UED form factors are complex

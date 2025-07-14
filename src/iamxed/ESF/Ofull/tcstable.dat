@@ -1,8 +1,0 @@
- #  Total cross section table (last run of 'elscata').
- #
- #  Z =   8,   projectile: electron
- #
- #   Energy         ECS         TCS1         TCS2         ABSCS      error
- #    (eV)        (cm**2)      (cm**2)      (cm**2)      (cm**2)
- #--------------------------------------------------------------------------
-   3.70000E+06  2.78344E-19  5.69753E-24  1.63081E-23  0.00000E+00  1.0E-07
