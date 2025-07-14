@@ -7,7 +7,7 @@ import numpy as np
 import os
 from argparse import Namespace
 
-from .io_utils import parse_cmd_args, output_logger, get_elements_from_input, export_static_data, export_tr_data
+from .io_utils import parse_cmd_args, output_logger, get_elements_from_input, export_static_data, export_tr_data, find_xyz_files
 from .physics import XRDDiffractionCalculator, UEDDiffractionCalculator
 from .plotting import plot_static, plot_time_resolved, plot_time_resolved_pdf
 
@@ -80,37 +80,33 @@ def iamxed(args: Namespace):
                 output += ' will be performed.'
         logger.info(output)
 
-        #todo: this must be finished
+        #todo: this must be polished
 
         # print how signal and reference geometries will be read and treated
-        if args.calculation_type == 'static':
-            if signal_geom_type == 'file':
+        if signal_geom_type == 'file':
+            if args.calculation_type == 'static':
                 logger.info(f'Signal geometries will be read from file ({args.signal_geoms})')
-            elif signal_geom_type == 'directory':
-                logger.info(f'Signal geometries will be read from directory ({args.signal_geoms}) - ensemble calculation will be performed.')
-
-            if ref_calc:
-                logger.info(f'Reference provided ({args.reference_geoms}), difference calculation will be performed.')
-                if ref_geom_type == 'directory':
-                    logger.info('Reference is a directory - ensemble averaging will be used for reference.')
-            else:
-                logger.info('No reference provided, only signal calculation will be performed.')
-
-            # todo: print all files found in directory
-
-        elif args.calculation_type == 'time-resolved':
-            if signal_geom_type == 'file':
-                logger.info(f' Signal geometries will be read from file ({args.signal_geoms})')
-            elif signal_geom_type == 'directory':
+            elif args.calculation_type == 'time-resolved':
+                logger.info(f'Trajectory will be read from file ({args.signal_geoms})')
+        elif signal_geom_type == 'directory':
+            if args.calculation_type == 'static':
+                logger.info(f'Signal geometries will be read from directory ({args.signal_geoms}).')
+            elif args.calculation_type == 'time-resolved':
                 logger.info(
-                    f'Signal geometries will be read from directory ({args.signal_geoms}) - ensemble calculation will be performed.')
+                    f'Trajectories will be read from directory ({args.signal_geoms}).')
 
-            if ref_calc:
-                logger.info(f' Reference provided ({args.reference_geoms}), difference calculation will be performed.')
-                if ref_geom_type == 'directory':
-                    logger.info(' Reference is a directory - ensemble averaging will be used for reference.')
-            else:
-                logger.info(' No reference provided, only signal calculation will be performed.')
+        if signal_geom_type == 'directory':
+            logger.info(
+                'List of XYZ files found in signal geometries directory:\n* ' + '\n* '.join(find_xyz_files(args.signal_geoms)))
+
+        if ref_calc:
+            logger.info(f'Reference provided ({args.reference_geoms}), difference calculation will be performed.')
+            if ref_geom_type == 'directory':
+                logger.info('Reference is a directory - ensemble averaging will be used for reference.')
+                logger.info('List of files found in reference geometries directory:\n* ' + '\n* '.join(
+                    find_xyz_files(args.ref_geoms)))
+        else:
+            logger.info('No reference provided, only signal calculation will be performed.')
 
     ### code ###
     # check that args are Namespace in case iamxed is called from python script

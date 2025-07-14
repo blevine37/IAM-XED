@@ -43,7 +43,8 @@ def read_xyz(filename: str) -> Tuple[List[str], np.ndarray]:
     with open(filename) as xyz:
         n_atoms = int(xyz.readline())
         _ = xyz.readline()
-        for line in xyz:
+        for _ in range(n_atoms):
+            line = xyz.readline()
             if len(line.strip()) == 0:
                 break
             try:
