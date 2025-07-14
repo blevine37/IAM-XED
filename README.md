@@ -19,6 +19,18 @@ Run the tests to ensure everything is working correctly. Make sure you have pyte
 pytest -v
 ```
 
+## Input Files
+Note that all geometries should be in XYZ format and in Angstroms.
+### Signal Geometries TODO finish!!!!
+Keyword `--signal-geoms` is used to specify the input containing the molecular geometries for which the diffraction pattern is calculated. 
+Several types of input files are supported with different functionalities for static or time-resolved calculations:
+- single XYZ file:
+  - static calculation: all geometries in the file are averaged to calculate the static signal
+  - time-resolved calculation: the file is treated as a trajectory with a time step set by `--timestep`
+- folder with multiple XYZ files:
+  - static calculation: all files in the folder are averaged to calculate the static signal
+  - time-resolved calculation: each file is treated as a separate geometry at a different time step
+
 ## Usage
 Once the package is installed, you can use iamxed as a script
 ```bash
