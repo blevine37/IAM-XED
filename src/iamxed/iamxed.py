@@ -90,23 +90,29 @@ def iamxed(args: Namespace):
                 logger.info(f'Trajectory will be read from file ({args.signal_geoms})')
         elif signal_geom_type == 'directory':
             if args.calculation_type == 'static':
-                logger.info(f'Signal geometries will be read from directory ({args.signal_geoms}).')
+                logger.info(f"Signal geometries will be read as only the first geometries in all XYZ files in "
+                            f"'{args.signal_geoms}' directory.")
             elif args.calculation_type == 'time-resolved':
                 logger.info(
                     f'Trajectories will be read from directory ({args.signal_geoms}).')
 
         if signal_geom_type == 'directory':
             logger.info(
-                'List of XYZ files found in signal geometries directory:\n* ' + '\n* '.join(find_xyz_files(args.signal_geoms)))
+                'List of XYZ files found in signal directory:\n* ' + '\n* '.join(find_xyz_files(args.signal_geoms)))
 
-        if ref_calc:
+        # todo: does it make sense to have calculations of time-resolved with reference?
+        if args.reference_geoms:
             logger.info(f'Reference provided ({args.reference_geoms}), difference calculation will be performed.')
             if ref_geom_type == 'directory':
-                logger.info('Reference is a directory - ensemble averaging will be used for reference.')
-                logger.info('List of files found in reference geometries directory:\n* ' + '\n* '.join(
-                    find_xyz_files(args.ref_geoms)))
+                logger.info(f"Reference geometries will be read as only the first geometries in all XYZ files in "
+                            f"'{args.signal_geoms}' directory.")
+                logger.info('List of files found in reference directory:\n* ' + '\n* '.join(
+                    find_xyz_files(args.reference_geoms)))
         else:
-            logger.info('No reference provided, only signal calculation will be performed.')
+            if args.calculation_type == 'time-resolved':
+                logger.info('No reference provided for time-resolved calculation -> first geometries all trajectories will be used as reference.')
+            else:
+                logger.info('No reference provided, only signal calculation will be performed.')
 
     ### code ###
     # check that args are Namespace in case iamxed is called from python script
@@ -118,9 +124,7 @@ def iamxed(args: Namespace):
 
     # Determine geometry types
     signal_geom_type = 'file' if os.path.isfile(args.signal_geoms) else 'directory'
-    ref_calc = False
     if args.reference_geoms is not None:
-        ref_calc = True
         ref_geom_type = 'file' if os.path.isfile(args.reference_geoms) else 'directory' # todo: check if this is correct, maybe it should be 'directory' if a directory is provided
 
     # Print header and input parameters
@@ -130,7 +134,7 @@ def iamxed(args: Namespace):
     try:
         elements = get_elements_from_input(args.signal_geoms)
     except FileNotFoundError as e:
-        logger.error(str(e))
+        logger.error('ERROR: ' + str(e))
         return 1
     logger.info(f"Elements found in input: {', '.join(elements)}")
 
@@ -148,7 +152,8 @@ def iamxed(args: Namespace):
             q_start=args.qmin,
             q_end=args.qmax,
             num_point=args.npoints,
-            elements=elements
+            elements=elements,
+            ued_energy_ev=3.7e6
         )
     logger.debug("[DEBUG]: Calculator initialized.")
 
@@ -158,9 +163,6 @@ def iamxed(args: Namespace):
             if args.calculation_type == 'static':
                 logger.info('Performing static difference calculation...')
                 q, diff_signal, r, diff_pdf = calculator.calc_difference(args.signal_geoms, args.reference_geoms)
-                if args.plot:
-                    logger.info('Plotting static difference signal...')
-                    plot_static(q, diff_signal, args.xrd, is_difference=True, plot_units=args.plot_units, r=r, pdf=diff_pdf, plot_flip=args.plot_flip)
                 if args.export:
                     export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=diff_signal)
             elif args.calculation_type == 'time-resolved':
@@ -170,9 +172,6 @@ def iamxed(args: Namespace):
             if args.calculation_type == 'static':
                 logger.info('Performing static calculation...')
                 q, signal, r, pdf = calculator.calc_single(args.signal_geoms)
-                if args.plot:
-                    logger.info('Plotting static signal...')
-                    plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf, plot_flip=args.plot_flip)
                 if args.export:
                     export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=signal)
             elif args.calculation_type == 'time-resolved':
@@ -195,14 +194,6 @@ def iamxed(args: Namespace):
                     )
                 # Get smoothed time axis for smoothed data
                 _, times_smooth = calculator.gaussian_smooth_2d_time(signal_raw, times, args.fwhm)
-                if args.plot:
-                    logger.info('Plotting time-resolved signal...')
-                    plot_time_resolved(times, q, signal_raw, args.xrd, plot_units=args.plot_units, smoothed=False, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
-                    plot_time_resolved(times_smooth, q, signal_smooth, args.xrd, plot_units=args.plot_units, smoothed=True, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
-                    if not args.xrd:  # Plot PDFs for UED only
-                        logger.info('Plotting time-resolved PDFs...')
-                        plot_time_resolved_pdf(times, r, pdfs_raw, smoothed=False, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
-                        plot_time_resolved_pdf(times_smooth, r, pdfs_smooth, smoothed=True, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
                 if args.export:
                     if args.ued:  # Include PDFs for UED only
                         export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
@@ -212,9 +203,38 @@ def iamxed(args: Namespace):
                         export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
                             signal_raw=signal_raw, signal_smooth=signal_smooth)
     except Exception as e:
-        logger.error(f"Error during calculation: {str(e)}")
+        logger.error(f"ERROR: Calculation issued exception: {str(e)}")
         return 1
-    logger.info('Calculation complete.')
+    logger.info('IAM-XED calculation complete!')
+
+    # plot results
+    if args.plot:
+        logger.info("\nPLOTTING\n--------")
+        try:
+            if args.reference_geoms:
+                if args.calculation_type == 'static':
+                    logger.info('Plotting static difference signal...')
+                    plot_static(q, diff_signal, args.xrd, is_difference=True, plot_units=args.plot_units, r=r,
+                        pdf=diff_pdf, plot_flip=args.plot_flip)
+            else:
+                if args.calculation_type == 'static':
+                    logger.info('Plotting static signal...')
+                    plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf, plot_flip=args.plot_flip)
+                elif args.calculation_type == 'time-resolved':
+                    logger.info('Plotting time-resolved signal...')
+                    plot_time_resolved(times, q, signal_raw, args.xrd, plot_units=args.plot_units, smoothed=False,
+                        fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
+                    plot_time_resolved(times_smooth, q, signal_smooth, args.xrd, plot_units=args.plot_units,
+                        smoothed=True, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
+                    if not args.xrd:  # Plot PDFs for UED only
+                        logger.info('Plotting time-resolved PDFs...')
+                        plot_time_resolved_pdf(times, r, pdfs_raw, smoothed=False, fwhm_fs=args.fwhm,
+                            plot_flip=args.plot_flip)
+                        plot_time_resolved_pdf(times_smooth, r, pdfs_smooth, smoothed=True, fwhm_fs=args.fwhm,
+                            plot_flip=args.plot_flip)
+        except Exception as e:
+            logger.error(f"ERROR: Plotting issued exception: {str(e)}")
+            return 1
     return 0
 
 if __name__ == '__main__':

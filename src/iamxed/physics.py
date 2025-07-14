@@ -38,7 +38,7 @@ class BaseDiffractionCalculator(ABC):
     @abstractmethod
     def load_form_factors(self):
         """Load form factors for the calculation."""
-        pass
+        pass # placeholder for abstract method which is implemented in subclasses
         
     def calc_molecular_intensity(self, aafs: List[np.ndarray], coords: np.ndarray) -> np.ndarray:
         """Calculate molecular intensity."""
@@ -139,7 +139,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             elements: List of elements to load form factors for
             inelastic: Whether to include inelastic scattering
         """
-        super().__init__(q_start, q_end, num_point, elements)
+        super().__init__(q_start, q_end, num_point, elements) # initialize base class
         self.inelastic = inelastic
         self.Szaloki_params = {}
         if inelastic:
@@ -238,11 +238,8 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
     def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry XRD pattern, or average over all geometries in a directory or trajectory file."""
-        import os
         if os.path.isdir(geom_file):
             xyz_files = find_xyz_files(geom_file)
-            if not xyz_files:
-                raise ValueError(f'No XYZ files found in directory: {geom_file}')
             signals = []
             for f in xyz_files:
                 atoms, coords = read_xyz(f)  #Note: Currently expects single frame files
@@ -432,10 +429,10 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
     
     def __init__(self, q_start: float, q_end: float, num_point: int, elements: List[str],
                  ued_energy_ev: float = 3.7e6):
-        super().__init__(q_start, q_end, num_point, elements)
+        super().__init__(q_start, q_end, num_point, elements) # initialize base class
         self.ued_energy_ev = ued_energy_ev
         self.elekin_ha = ued_energy_ev / 27.2114
-        self.k = (self.elekin_ha * (self.elekin_ha + 2 * 137 ** 2)) ** 0.5 / 137
+        self.k = (self.elekin_ha * (self.elekin_ha + 2 * 137 ** 2)) ** 0.5 / 137 # getting relativistic electron wave vector
         
     def load_form_factors(self):
         """Load UED form factors from esf_data.py."""
