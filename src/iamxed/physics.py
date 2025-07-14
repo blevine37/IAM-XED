@@ -16,6 +16,7 @@ except ImportError:
 
 from .io_utils import read_xyz, read_xyz_trajectory, find_xyz_files, is_trajectory_file
 from .XSF.xsf_data_elastic import XSF_DATA
+from .ESF.esf_data import ESF_DATA
 
 # Physical constants
 ANG_TO_BH = 1.8897259886
@@ -437,36 +438,25 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         self.k = (self.elekin_ha * (self.elekin_ha + 2 * 137 ** 2)) ** 0.5 / 137
         
     def load_form_factors(self):
-        """Load UED form factors."""
+        """Load UED form factors from esf_data.py."""
         self.form_factors = {}
         for el in self.elements:
-            scatamp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ESF', f'{el}full', 'scatamp.dat')
-            if not os.path.exists(scatamp_path):
-                raise ValueError(f"UED scattering data not found for element '{el}' at {scatamp_path}")
-                
-            data = []
-            with open(scatamp_path) as f:
-                for line in f:
-                    if line.strip().startswith('#') or line.strip() == '' or line.startswith('---'):
-                        continue
-                    parts = line.split()
-                    if len(parts) < 4:
-                        continue
-                    angle = float(parts[0])
-                    reF = float(parts[2]) * CM_TO_BOHR
-                    imF = float(parts[3]) * CM_TO_BOHR
-                    data.append([angle, reF, imF])
-                    
-            data = np.array(data)
+            if el not in ESF_DATA:
+                raise ValueError(f"UED scattering data not found for element '{el}' in ESF_DATA")
+            
+            # Get data from ESF_DATA
+            data = ESF_DATA[el]
             theta_vals = data[:, 0]  # degrees
+            reF_vals = data[:, 1] * CM_TO_BOHR  # Convert cm to bohr
+            imF_vals = data[:, 2] * CM_TO_BOHR  # Convert cm to bohr
             
             # Convert q to theta for interpolation
             with np.errstate(invalid='ignore'):
                 thetafit = 2 * np.arcsin(np.clip(self.qfit / (2 * self.k), -1, 1)) * 180 / np.pi
                 
             # Interpolate real and imag parts
-            fre = interp1d(theta_vals, data[:, 1], kind='cubic', bounds_error=False, fill_value=0)
-            fim = interp1d(theta_vals, data[:, 2], kind='cubic', bounds_error=False, fill_value=0)
+            fre = interp1d(theta_vals, reF_vals, kind='cubic', bounds_error=False, fill_value=0)
+            fim = interp1d(theta_vals, imF_vals, kind='cubic', bounds_error=False, fill_value=0)
             yre = fre(thetafit)
             yim = fim(thetafit)
             self.form_factors[el] = yre + 1j * yim  # UED form factors are complex
