@@ -17,9 +17,9 @@ except ImportError:
 from .io_utils import read_xyz, read_xyz_trajectory, find_xyz_files, is_trajectory_file
 from .XSF.xsf_data_elastic import XSF_DATA
 from .ESF.esf_data import ESF_DATA
-import logging
+from logging import getLogger
 
-logger = logging.getLogger("my_logger") # getting logger
+logger = getLogger("my_logger") # getting logger
 
 # Physical constants
 ANG_TO_BH = 1.8897259886
@@ -144,11 +144,11 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         """
         super().__init__(q_start, q_end, num_point, elements) # initialize base class
         self.inelastic = inelastic
-        self.Szaloki_params = {}
+        self.Szaloki_params = None
         self.load_form_factors()
         if inelastic:
             self.load_Szaloki_params()
-            
+
     def load_Szaloki_params(self):
         """Load Szaloki parameters for inelastic scattering."""
         xsf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'XSF')
@@ -175,72 +175,72 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         
     def calc_atomic_intensity(self, atoms: List[str]) -> np.ndarray:
         """Calculate atomic intensity for XRD."""
+        logger.debug("[DEBUG]: Calculating atomic intensity for XRD")
         Iat = np.zeros_like(self.qfit)
         for atom in atoms:
             ff = self.form_factors[atom]
             Iat += ff ** 2
-            if self.inelastic and self.Szaloki_params is not None:
+            if self.inelastic:
+                if self.Szaloki_params is None:
+                    logger.error("ERROR: Szaloki parameters not loaded for inelastic scattering.")
+                    raise RuntimeError("Szaloki parameters not loaded for inelastic scattering.")
                 # Add inelastic contribution
-                atn = self.get_atomic_number(atom)
-                inel = self.calc_inelastic(atn)
+                inel = self.calc_inelastic(atom)
                 Iat += inel
         return Iat
-        
-    def get_atomic_number(self, element: str) -> int:
-        """Get atomic number for element."""
-        # Atomic number (1-based) to element symbol mapping for Z=1-98
-        ELEMENTS = [
-            None,  # 0-index placeholder
-            'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
-            'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
-            'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-            'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr',
-            'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn',
-            'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd',
-            'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb',
-            'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg',
-            'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th',
-            'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf'
-        ]
-        
-        try:
-            return ELEMENTS.index(element)
-        except ValueError:
-            logger.error(f"ERROR: Element '{element}' not found in periodic table (Z=1-98)")
-            raise ValueError(f"Element '{element}' not found in periodic table (Z=1-98)")
 
-    def calc_inelastic(self, atomic_number: int) -> np.ndarray:
+    def calc_inelastic(self, element: str) -> np.ndarray:
         """Calculate inelastic scattering for given atomic number."""
-        if self.Szaloki_params is None:
-            return np.zeros_like(self.qfit)
-        params = self.Szaloki_params[atomic_number-1, :]
+
+        def get_atomic_number(element: str) -> int:
+            """Get atomic number for element."""
+            # Atomic number (1-based) to element symbol mapping for Z=1-98
+            ELEMENTS = [
+                'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K',
+                'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr',
+                'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te', 'I',
+                'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb',
+                'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr',
+                'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf']
+
+            try:
+                return ELEMENTS.index(element)+1
+            except ValueError:
+                logger.error(f"ERROR: Element '{element}' not found in periodic table (Z=1-98)")
+                raise ValueError(f"Element '{element}' not found in periodic table (Z=1-98)")
+
+        def calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, q):
+            """Calculating inelastic scattering contribution."""
+
+            def calc_s1(q, d1, d2, d3):
+                s1 = np.zeros_like(q)
+                for i, d in enumerate([d1, d2, d3]):
+                    s1 += d*(np.exp(q) - 1)**(i + 1) #todo: why power of i+1?
+                return s1
+
+            def calc_s2(q, Z, d1, d2, d3, q1, t1, t2, t3):
+                s1 = calc_s1(q, d1, d2, d3) #todo: why not used?
+                s1q1 = calc_s1(q1, d1, d2, d3)
+                g1 = 1 - np.exp(t1*(q1 - q))
+                g2 = 1 - np.exp(t3*(q1 - q))
+                # return (Z - s1 - t2)*g1 + t2*g2 + s1q1 #todo: this is according to Szaloki paper
+                return (Z - s1q1 - t2)*g1 + t2*g2 + s1q1
+
+            s = np.zeros_like(q)
+            s1 = calc_s1(q, d1, d2, d3)
+            s2 = calc_s2(q, Z, d1, d2, d3, q1, t1, t2, t3)
+            s[q < q1] = s1[q < q1]
+            s[q >= q1] = s2[q >= q1]
+            return s
+
+        atomic_number = get_atomic_number(element)
+
+        atom_index = np.where(self.Szaloki_params[:, 0] == atomic_number)[0][0]
+        params = self.Szaloki_params[atom_index]
         Z, d1, d2, d3, q1, t1, t2, t3, *_ = params
-        return self._calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, self.qfit * ANG_TO_BH / (4 * np.pi))
-        
-    @staticmethod
-    def _calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, q):
-        """Helper for inelastic calculation."""
-        s = np.zeros_like(q)
-        s1 = XRDDiffractionCalculator._calc_s1(q, d1, d2, d3)
-        s2 = XRDDiffractionCalculator._calc_s2(q, Z, d1, d2, d3, q1, t1, t2, t3)
-        s[q < q1] = s1[q < q1]
-        s[q >= q1] = s2[q >= q1]
-        return s
-        
-    @staticmethod
-    def _calc_s1(q, d1, d2, d3):
-        s1 = np.zeros_like(q)
-        for i, d in enumerate([d1, d2, d3]):
-            s1 += d * (np.exp(q) - 1) ** (i + 1)
-        return s1
-        
-    @staticmethod
-    def _calc_s2(q, Z, d1, d2, d3, q1, t1, t2, t3):
-        s1 = XRDDiffractionCalculator._calc_s1(q, d1, d2, d3)
-        s1q1 = XRDDiffractionCalculator._calc_s1(q1, d1, d2, d3)
-        g1 = 1 - np.exp(t1 * (q1 - q))
-        g2 = 1 - np.exp(t3 * (q1 - q))
-        return (Z - s1q1 - t2) * g1 + t2 * g2 + s1q1
+
+        inel = calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, self.qfit * ANG_TO_BH / (4 * np.pi))
+        return inel
 
     def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry XRD pattern, or average over all geometries in a directory or trajectory file."""
@@ -449,15 +449,13 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             imF_vals = data[:, 2] * CM_TO_BOHR  # Convert cm to bohr
             
             # Convert q to theta for interpolation
-            with np.errstate(invalid='ignore'):
+            with np.errstate(invalid='warn'): # handle invalid values gracefully, WARNING: this may produce invisible NaNs
                 thetafit = 2 * np.arcsin(np.clip(self.qfit / (2 * self.k), -1, 1)) * 180 / np.pi
                 
             # Interpolate real and imag parts
             fre = interp1d(theta_vals, reF_vals, kind='cubic', bounds_error=False, fill_value=0)
             fim = interp1d(theta_vals, imF_vals, kind='cubic', bounds_error=False, fill_value=0)
-            yre = fre(thetafit)
-            yim = fim(thetafit)
-            self.form_factors[el] = yre + 1j * yim  # UED form factors are complex
+            self.form_factors[el] = fre(thetafit) + 1j * fim(thetafit)  # UED form factors are complex
 
     def calc_atomic_intensity(self, atoms: List[str]) -> np.ndarray:
         """Calculate atomic intensity for UED."""
