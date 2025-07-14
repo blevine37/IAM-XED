@@ -27,7 +27,7 @@ def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logg
 
     # Output file handler
     if file_output:
-        file_handler = logging.FileHandler('xed.out', mode='w')
+        file_handler = logging.FileHandler('iamxed.out', mode='w')
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
     
@@ -241,14 +241,14 @@ def parse_cmd_args():
     
     # Output options
     out_sec = parser.add_argument_group("Output options")
-    out_sec.add_argument('--log-to-file', action='store_true',
-                        help="Save output to 'xed.out' or 'ued.out' file.")
+    out_sec.add_argument('--log-to-file', action='store_false',
+                        help="Save output to 'iamxed.out'. Default: True.")
     out_sec.add_argument('--debug', action='store_true',
-                        help="Print debug output.")
-    out_sec.add_argument('--plot', action='store_true',
-                        help='Plot the results')
+                        help="Print debug output. Default: False.")
+    out_sec.add_argument('--plot', action='store_false',
+                        help='Plot the results. Default: True.')
     out_sec.add_argument('--plot-flip', action='store_true',
-                        help='Flip x and y axes in all plot.s')
+                        help='Flip x and y axes in all plot. Default: False.')
     out_sec.add_argument('--export', type=str,
                         help='Export calculated data to file.')
     out_sec.add_argument('--plot-units', type=str, default='bohr-1', choices=['bohr-1', 'angstrom-1'],
