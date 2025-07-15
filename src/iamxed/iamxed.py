@@ -44,7 +44,7 @@ def iamxed(args: Namespace):
                 continue
             if args.ued and key in ['xrd', 'inelastic']:
                 continue
-            elif args.xrd and key in ['ued']:
+            elif args.xrd and key in ['ued', 'pdf_alpha']:
                 continue
 
             add = ''

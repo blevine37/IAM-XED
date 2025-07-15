@@ -238,7 +238,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         inel = calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, self.qfit * ANG_TO_BH / (4 * np.pi))
         return inel
 
-    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_single(self, geom_file: str) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry XRD pattern, or average over all geometries in a directory or trajectory file."""
         if os.path.isdir(geom_file): # getting first geometry from all files in directory
             xyz_files = find_xyz_files(geom_file)
@@ -270,14 +270,16 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
     def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate difference between two geometries.
+
+        pdf_alpha: Damping parameter for PDF calculation (currently unused in XRD but kept for future development).
         
         For XRD, returns relative difference (I1-I2)/I2 * 100 as percentage.
         Atom order does not need to match, only the sets of elements must be the same.
         If either geom1 or geom2 is a directory or trajectory file, ensemble averaging will be performed.
         """
         # Get signals for both inputs using calc_single
-        _, I1, _, _ = self.calc_single(geom1, pdf_alpha)
-        _, I2, _, _ = self.calc_single(geom2, pdf_alpha)
+        _, I1, _, _ = self.calc_single(geom1)
+        _, I2, _, _ = self.calc_single(geom2)
         
         # Calculate relative difference in percent
         diff = (I1 - I2) / I2 * 100
@@ -465,23 +467,26 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         """Calculate single geometry UED pattern and PDF, or average over all geometries in a directory or trajectory file."""
         import os
         from .io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
+
+        def calculate_signal_and_pdf(atoms: List[str], coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+            """Calculate signal and PDF for a single geometry."""
+            Iat = self.calc_atomic_intensity(atoms)
+            Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
+            sm = self.qfit * (Imol / Iat)
+            sm_real = np.real(sm)
+            q_ang = self.qfit / BH_TO_ANG
+            sm_ang = sm_real / BH_TO_ANG
+            r = q_ang.copy()
+            pdf = self.FT(q_ang, sm_ang, pdf_alpha)
+            return sm_real, r, pdf
+
         if os.path.isdir(geom_file):
             xyz_files = find_xyz_files(geom_file)
-            if not xyz_files:
-                logger.error(f"ERROR: No XYZ files found in directory: {geom_file}")
-                raise ValueError(f'No XYZ files found in directory: {geom_file}')
             signals = []
             pdfs = []
             for f in xyz_files:
                 atoms, coords = read_xyz(f) #Note: Currently expects single frame files
-                Iat = self.calc_atomic_intensity(atoms)
-                Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-                sm = self.qfit * (Imol / Iat)
-                sm_real = np.real(sm)
-                q_ang = self.qfit / BH_TO_ANG
-                sm_ang = sm_real / BH_TO_ANG
-                r = q_ang.copy()  # Use same grid for r as q
-                pdf = self.FT(q_ang, sm_ang, pdf_alpha)
+                sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
                 signals.append(sm_real)
                 pdfs.append(pdf)
             avg_signal = np.mean(signals, axis=0)
@@ -491,16 +496,8 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             atoms, trajectory = read_xyz_trajectory(geom_file)
             signals = []
             pdfs = []
-            Iat = self.calc_atomic_intensity(atoms)
             for coords in trajectory:
-                #Iat = self.calc_atomic_intensity(atoms)
-                Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-                sm = self.qfit * (Imol / Iat)
-                sm_real = np.real(sm)
-                q_ang = self.qfit / BH_TO_ANG
-                sm_ang = sm_real / BH_TO_ANG
-                r = q_ang.copy()  # Use same grid for r as q
-                pdf = self.FT(q_ang, sm_ang, pdf_alpha)
+                sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
                 signals.append(sm_real)
                 pdfs.append(pdf)
             avg_signal = np.mean(signals, axis=0)
@@ -508,14 +505,8 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             return self.qfit, avg_signal, r, avg_pdf
         else:
             atoms, coords = read_xyz(geom_file)
-            Iat = self.calc_atomic_intensity(atoms)
-            Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            sm = self.qfit * (Imol / Iat)
-            sm_real = np.real(sm)
-            q_ang = self.qfit / BH_TO_ANG
-            sm_ang = sm_real / BH_TO_ANG
-            r = q_ang.copy()  # Use same grid for r as q
-            pdf = self.FT(q_ang, sm_ang, pdf_alpha)
+            sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
+
             return self.qfit, sm_real, r, pdf
 
     def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
