@@ -53,7 +53,7 @@ class BaseDiffractionCalculator(ABC):
                     continue
                 r_ij = np.linalg.norm(i_p - j_p)
                 qr = self.qfit * r_ij
-                sinc_term = np.sinc(qr / np.pi) # todo: why divided by pi?
+                sinc_term = np.sinc(qr / np.pi) # qr / np.pi to remove normalization factor
                 Imol += np.conjugate(i_aaf) * j_aaf * sinc_term # np.conjugate is used for UED to handle complex form factors but does not affect floats in XRD
         return Imol
 
@@ -107,7 +107,7 @@ class BaseDiffractionCalculator(ABC):
         return Z_smooth, times_extended
 
     @staticmethod
-    def FT(s: np.ndarray, T: np.ndarray, alpha: float) -> np.ndarray:
+    def FT(r: np.ndarray, s: np.ndarray, T: np.ndarray, alpha: float) -> np.ndarray:
         """Fourier transform for PDF calculation.
         
         Args:
@@ -118,10 +118,30 @@ class BaseDiffractionCalculator(ABC):
         Returns:
             PDF on same grid as input
         """
+        logger.debug("[DEBUG]: Entering Fourier transform for PDF calculation")
         T = np.nan_to_num(T)
         Tr = np.empty_like(T)
-        for pos, k in enumerate(s):
+        for pos, k in enumerate(r):
             Tr[pos] = k * np.trapz(T * np.sin(s * k) * np.exp(-alpha * s**2), x=s)
+
+
+        ### THE FOLLOWING COMMENTED OUT CODE IS AND ALTERNATIVE IMPLEMENTATION USING DST ###
+        # Discrete Sine Transform (DST) can massively speed up calculations but it has some artifacts.
+        # Using numerical integration with np.trapz is more accurate but slower.
+        # Currently, we use np.trapz for accuracy but we intend to add flag for fast calculations.
+        #
+        # from scipy.fft import dst
+        #
+        # s2 = np.linspace(0, 5000, 500000)
+        # damped_T = np.interp(s2, s, T*np.exp(-alpha*s**2))  # Interpolate T to new s grid
+        #
+        # Tr2 = np.fft.fftshift(dst(damped_T, type=2, norm='ortho'))  # Discrete sine transform
+        # r2 = np.pi*np.fft.fftshift(np.fft.fftfreq(len(s2), (s2[1] - s2[0])))  # Frequency grid for FFT
+        # Tr2 = np.interp(r, r2, Tr2)  # Interpolate back to original r grid
+        # Tr2 *= r  # Scale by r
+
+        logger.debug("[DEBUG]: Finished Fourier transform for PDF calculation")
+
         return Tr
 
 class XRDDiffractionCalculator(BaseDiffractionCalculator):
@@ -211,7 +231,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             def calc_s1(q, d1, d2, d3):
                 s1 = np.zeros_like(q)
                 for i, d in enumerate([d1, d2, d3]):
-                    s1 += d*(np.exp(q) - 1)**(i + 1) #todo: why power of i+1?
+                    s1 += d*(np.exp(q) - 1)**(i + 1)
                 return s1
 
             def calc_s2(q, Z, d1, d2, d3, q1, t1, t2, t3):
@@ -477,7 +497,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             q_ang = self.qfit / BH_TO_ANG
             sm_ang = sm_real / BH_TO_ANG
             r = q_ang.copy()
-            pdf = self.FT(q_ang, sm_ang, pdf_alpha)
+            pdf = self.FT(r, q_ang, sm_ang, pdf_alpha)
             return sm_real, r, pdf
 
         if os.path.isdir(geom_file):
@@ -525,7 +545,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         q_ang = r1 / 0.529177
         sm_diff_ang = sm_diff / 0.529177
         r_diff = r1  # Use same grid for r as q
-        pdf_diff = self.FT(q_ang, sm_diff_ang, pdf_alpha)
+        pdf_diff = self.FT(r_diff, q_ang, sm_diff_ang, pdf_alpha)
         return self.qfit, sm_diff, r_diff, pdf_diff
 
     def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -576,7 +596,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             
             # Calculate PDF for this frame using provided alpha
             sm_ang = rel / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
-            pdf = self.FT(q_ang, sm_ang, pdf_alpha)
+            pdf = self.FT(r, q_ang, sm_ang, pdf_alpha)
             
             signals.append(rel)
             pdfs.append(pdf)
@@ -655,7 +675,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         sm_ang = signal_raw / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
         pdfs_raw = np.empty((len(q_ang), signal_raw.shape[1]))
         for t in range(signal_raw.shape[1]):
-            pdfs_raw[:, t] = self.FT(q_ang, sm_ang[:, t], pdf_alpha)
+            pdfs_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha)
         pdfs_raw = np.real(pdfs_raw)
         times = np.arange(max_frames) * dt_fs
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
