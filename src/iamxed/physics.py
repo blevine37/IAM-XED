@@ -4,7 +4,7 @@ Contains base calculator class and specific implementations for XRD and UED.
 """
 import numpy as np
 from scipy.interpolate import interp1d
-import scipy.ndimage
+from scipy.ndimage import gaussian_filter1d
 import os
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Dict
@@ -26,6 +26,7 @@ ANG_TO_BH = 1.8897259886
 BH_TO_ANG = 1 / ANG_TO_BH
 S_TO_Q = 4 * np.pi
 CM_TO_BOHR = 188972598.85789
+AU_TO_FS = 0.02418884254
 
 class BaseDiffractionCalculator(ABC):
     """Base class for diffraction calculations."""
@@ -88,7 +89,7 @@ class BaseDiffractionCalculator(ABC):
         Z_padded = np.pad(Z, ((0, 0), (pad_width, pad_width)), mode='edge')
         
         # Apply Gaussian filter
-        Z_smooth = scipy.ndimage.gaussian_filter1d(
+        Z_smooth = gaussian_filter1d(
             Z_padded, 
             sigma=sigma_steps,
             axis=1,
@@ -344,42 +345,42 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         else:
             n_frames = len(trajectory)
         #Loop over frames
-        for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Trajectory frames', total=n_frames, mininterval=0, dynamic_ncols=True)):
+        for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
             # Check if we've reached the time limit
             current_time = i * dt_fs
             if tmax_fs is not None and current_time > tmax_fs:
                 break
-                
+
             # Calculate current frame intensities
             #Iat = self.calc_atomic_intensity(atoms)
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
             I = Iat0 + Imol
-            
+
             # Calculate relative difference in percent
             rel = (I - I0) / I0 * 100
             signals.append(rel)
-            
+
         signal_raw = np.array(signals).T
-        
+
         # Calculate time axis for the frames we actually processed
         times = np.arange(len(signals)) * dt_fs
-        
+
         # Apply temporal smoothing
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
-        
+
         # Return dummy PDF arrays for compatibility with UED
         r = np.array([0.0])  # Dummy r grid
         pdfs_raw = np.zeros((1, signal_raw.shape[1]))  # Dummy raw PDFs
         pdfs_smooth = np.zeros((1, signal_smooth.shape[1]))  # Dummy smoothed PDFs
-        
+
         return times_smooth, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth
 
     def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate ensemble average of trajectories.
-        
+
         Returns relative differences (I(t)-I(0))/I(0) * 100 as percentage.
         For each time point, average over all available trajectories.
-        
+
         Args:
             xyz_dir: Directory containing XYZ trajectory files
             timestep_au: Time step in atomic units
@@ -387,16 +388,15 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             pdf_alpha: Damping parameter for PDF calculation (unused in XRD)
             tmax_fs: Maximum time to calculate up to in femtoseconds
         """
+        logger.debug("[DEBUG]: Starting ensemble average calculation for XRD trajectories")
+
         xyz_files = find_xyz_files(xyz_dir)
-        if not xyz_files:
-            logger.error(f"ERROR: No XYZ files found in directory: {xyz_dir}")
-            raise ValueError(f"No XYZ files found in directory: {xyz_dir}")
         all_Imol = []
         all_Imol0 = []
         max_frames = 0
-        dt_fs = timestep_au / 40 * 0.9675537016
+        dt_fs = timestep_au * AU_TO_FS
         Iat0 = None
-        for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Ensemble files')):
+        for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Trajectory files', leave=False)):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
             if Iat0 is None:
                 Iat0 = self.calc_atomic_intensity(atoms)
@@ -408,7 +408,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             else:
                 n_frames = len(trajectory)
             #Loop over frames
-            for i, frame in enumerate(tqdm(trajectory[:n_frames], desc='Frames', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
+            for i, frame in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
                 # Check if we've reached the time limit
                 current_time = i * dt_fs
                 if tmax_fs is not None and current_time > tmax_fs:
@@ -418,6 +418,15 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             Imol_traj = np.array(Imol_traj).T
             all_Imol.append(Imol_traj)
             max_frames = max(max_frames, Imol_traj.shape[1])
+        logger.info('* Signal for individual trajectories calculated.')
+
+        # getting trajectories ending prematurely
+        for idx, traj in enumerate(all_Imol):
+            traj_frames = traj.shape[1]
+            if traj_frames < max_frames:
+                logger.warning(f" - Trajectory {xyz_files[idx]} has fewer frames ({traj_frames}) than the maximum ({max_frames}).")
+
+        # padding signal such that all trajectories have the same number of frames, unavalable numbers will be padded with NaN
         padded_Imol = []
         for Imol in all_Imol:
             if Imol.shape[1] < max_frames:
@@ -426,28 +435,30 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             else:
                 padded = Imol
             padded_Imol.append(padded)
-        stacked_Imol = np.stack(padded_Imol, axis=0)
-        mean_Imol = np.nanmean(stacked_Imol, axis=0)
+        logger.info('* Trajectories shorter than tmax handled (not contributing to ensemble average for longer times than their duration).')
+
+        # ensemble average
+        mean_Imol = np.nanmean(np.stack(padded_Imol, axis=0), axis=0)
         mean_Imol0 = np.nanmean(np.stack(all_Imol0, axis=0), axis=0)
-        if Iat0 is None:
+        if Iat0 is None: # this should be unnecessary since we check we have some trajectory files
             logger.error(f"ERROR: No valid trajectories found to compute atomic intensity (Iat0).")
             raise ValueError("No valid trajectories found to compute atomic intensity (Iat0).")
-        numerator = (Iat0[:, None] + mean_Imol) - (Iat0[:, None] + mean_Imol0[:, None])
-        denominator = (Iat0[:, None] + mean_Imol0[:, None])
+        logger.info('* Signal averaged over trajectories.')
+
+        numerator = mean_Imol - mean_Imol0[:, None] # [:, None] casts (N,) array to (N, 1) for element-wise operations
+        denominator = Iat0[:, None] + mean_Imol0[:, None]
         signal_raw = numerator / denominator * 100
+        logger.info('* Difference signal calculated by subtracting reference.')
+
         times = np.arange(max_frames) * dt_fs
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
-        
-        # Return dummy PDF arrays for compatibility with UED
-        r = np.array([0.0])  # Dummy r grid
-        pdfs_raw = np.zeros((1, signal_raw.shape[1]))  # Dummy raw PDFs
-        pdfs_smooth = np.zeros((1, signal_smooth.shape[1]))  # Dummy smoothed PDFs
-        
-        return times, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth
+        logger.info('* Temporal convolution with Gaussian kernel applied.')
+
+        return times, self.qfit, signal_raw, signal_smooth, None, None, None
 
 class UEDDiffractionCalculator(BaseDiffractionCalculator):
     """UED-specific calculator implementation."""
-    
+
     def __init__(self, q_start: float, q_end: float, num_point: int, elements: List[str],
                  ued_energy_ev: float = 3.7e6):
         super().__init__(q_start, q_end, num_point, elements) # initialize base class
@@ -456,7 +467,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         self.k = (self.elekin_ha * (self.elekin_ha + 2 * 137 ** 2)) ** 0.5 / 137 # getting relativistic electron wave vector
         self.load_form_factors()
 
-        
+
     def load_form_factors(self):
         """Load UED form factors from esf_data.py."""
         self.form_factors = {}
@@ -470,11 +481,11 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             theta_vals = data[:, 0]  # degrees
             reF_vals = data[:, 1] * CM_TO_BOHR  # Convert cm to bohr
             imF_vals = data[:, 2] * CM_TO_BOHR  # Convert cm to bohr
-            
+
             # Convert q to theta for interpolation
             with np.errstate(invalid='warn'): # handle invalid values gracefully, WARNING: this may produce invisible NaNs
                 thetafit = 2 * np.arcsin(np.clip(self.qfit / (2 * self.k), -1, 1)) * 180 / np.pi
-                
+
             # Interpolate real and imag parts
             fre = interp1d(theta_vals, reF_vals, kind='cubic', bounds_error=False, fill_value=0)
             fim = interp1d(theta_vals, imF_vals, kind='cubic', bounds_error=False, fill_value=0)
@@ -487,7 +498,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             ff = self.form_factors[atom]  # Complex form factor
             Iat += ff * np.conjugate(ff)  # Multiply by conjugate to get real intensity
         return np.real(Iat)  # Return real part since intensity must be real
-            
+
     def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry UED pattern and PDF, or average over all geometries in a directory or trajectory file."""
         import os
@@ -536,7 +547,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
     def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate difference between two geometries and its PDF.
-        
+
         Atom order does not need to match, only the sets of elements must be the same.
         If either geom1 or geom2 is a directory or trajectory file, ensemble averaging will be performed.
         """
@@ -554,14 +565,14 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
     def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate time-resolved UED pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.
-        
+
         Args:
             trajfile: Path to trajectory file
             timestep_au: Time step in atomic units
             fwhm_fs: FWHM of Gaussian smoothing in fs
             pdf_alpha: Damping parameter for PDF calculation
             tmax_fs: Maximum time to calculate up to in femtoseconds
-        
+
         Returns:
             times: Time points in fs
             q: Q-grid in atomic units
@@ -577,50 +588,50 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         sm0 = np.real(sm0)
         signals = []
         pdfs = []
-        
+
         # Calculate q grid in Angstroms for PDF
         q_ang = self.qfit / BH_TO_ANG
         r = q_ang.copy()
-        
+
         dt_fs = timestep_au / 40 * 0.9675537016  # Convert timestep to fs
         if tmax_fs is not None:
             n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
         else:
             n_frames = len(trajectory)
-        for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Trajectory frames', total=n_frames, mininterval=0, dynamic_ncols=True)):
+        for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
             # Check if we've reached the time limit
             current_time = i * dt_fs
             if tmax_fs is not None and current_time > tmax_fs:
                 break
-                
+
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
             sm = self.qfit * (Imol / Iat)
             sm = np.real(sm)
             rel = sm - sm0
-            
+
             # Calculate PDF for this frame using provided alpha
             sm_ang = rel / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
             pdf = self.FT(r, q_ang, sm_ang, pdf_alpha)
-            
+
             signals.append(rel)
             pdfs.append(pdf)
-            
+
         signal_raw = np.array(signals).T
         pdfs_raw = np.array(pdfs).T      # Shape: [r_points, time_points]
-        
+
         # Calculate time axis for the frames we actually processed
         times = np.arange(len(signals)) * dt_fs
-        
+
         # Smooth signals and PDFs separately
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
         pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
-        
+
         return times, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth
 
     def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> tuple:
         """Calculate ensemble-averaged signal and PDF from a directory of trajectories, matching the interface of calc_trajectory.
         For each time point, average over all available trajectories.
-        
+
         Args:
             xyz_dir: Directory containing XYZ trajectory files
             timestep_au: Time step in atomic units
@@ -629,9 +640,6 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             tmax_fs: Maximum time to calculate up to in femtoseconds
         """
         xyz_files = find_xyz_files(xyz_dir)
-        if not xyz_files:
-            logger.error(f"ERROR: No XYZ files found in directory: {xyz_dir}")
-            raise ValueError(f"No XYZ files found in directory: {xyz_dir}")
         all_Imol = []
         all_Imol0 = []
         all_pdfs = []
@@ -642,7 +650,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         r = q_ang.copy()
         Iat0 = None
         all_s = []  # Will hold s_k(t) for each trajectory
-        for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Ensemble files')):
+        for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Trajectory files', leave=False)):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
             if Iat0 is None:
                 Iat0 = self.calc_atomic_intensity(atoms)
@@ -651,7 +659,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
                 n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
             else:
                 n_frames = len(trajectory)
-            for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Frames', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
+            for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
                 current_time = i * dt_fs
                 if tmax_fs is not None and current_time > tmax_fs:
                     break
@@ -661,6 +669,14 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             s_traj = np.array(s_traj).T  # [q, t]
             all_s.append(s_traj)
             max_frames = max(max_frames, s_traj.shape[1])
+        logger.info('* Signal for individual trajectories calculated.')
+
+        # getting trajectories ending prematurely
+        for idx, traj in enumerate(all_s):
+            traj_frames = traj.shape[1]
+            if traj_frames < max_frames:
+                logger.warning(f" - Trajectory {xyz_files[idx]} has fewer frames ({traj_frames}) than the maximum ({max_frames}).")
+
         # Pad all s to max_frames with NaN
         padded_s = []
         for s in all_s:
@@ -670,18 +686,26 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             else:
                 padded = s
             padded_s.append(padded)
+        logger.info('* Trajectories shorter than tmax handled (not contributing to ensemble average for longer times than their duration).')
+
         stacked_s = np.stack(padded_s, axis=0)  # [n_traj, q, t]
         mean_s = np.nanmean(stacked_s, axis=0)   # [q, t]
         mean_s0 = np.nanmean(stacked_s[:, :, 0], axis=0)  # [q]
         # Final signal: mean_s(t) - mean_s(0)
         signal_raw = np.real(mean_s - mean_s0[:, None])
+        logger.info('* Signal averaged over trajectories.')
+
         # Now calculate PDF from the final signal
         sm_ang = signal_raw / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
         pdfs_raw = np.empty((len(q_ang), signal_raw.shape[1]))
         for t in range(signal_raw.shape[1]):
             pdfs_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha)
         pdfs_raw = np.real(pdfs_raw)
+        logger.info('* PDF calculated from averaged signal.')
+
         times = np.arange(max_frames) * dt_fs
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
         pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
+        logger.info('* Temporal convolution with Gaussian kernel applied.')
+        
         return times, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth 
