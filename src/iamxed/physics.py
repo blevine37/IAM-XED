@@ -339,11 +339,13 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         I0 = Iat0 + Imol0
         
         signals = []
-        dt_fs = timestep_au / 40 * 0.9675537016  # Convert timestep to fs
+        dt_fs = timestep_au * AU_TO_FS  # Convert timestep to fs
+
         if tmax_fs is not None:
             n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
         else:
             n_frames = len(trajectory)
+
         #Loop over frames
         for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
             # Check if we've reached the time limit
@@ -352,7 +354,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
                 break
 
             # Calculate current frame intensities
-            #Iat = self.calc_atomic_intensity(atoms)
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
             I = Iat0 + Imol
 
@@ -360,20 +361,15 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             rel = (I - I0) / I0 * 100
             signals.append(rel)
 
-        signal_raw = np.array(signals).T
+        dIoverI = np.array(signals).T
 
         # Calculate time axis for the frames we actually processed
         times = np.arange(len(signals)) * dt_fs
 
         # Apply temporal smoothing
-        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
+        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
 
-        # Return dummy PDF arrays for compatibility with UED
-        r = np.array([0.0])  # Dummy r grid
-        pdfs_raw = np.zeros((1, signal_raw.shape[1]))  # Dummy raw PDFs
-        pdfs_smooth = np.zeros((1, signal_smooth.shape[1]))  # Dummy smoothed PDFs
-
-        return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth
+        return times, self.qfit, dIoverI, times_smooth, signal_smooth, None, None, None
 
     def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate ensemble average of trajectories.
@@ -582,20 +578,24 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         """
         atoms, trajectory = read_xyz_trajectory(trajfile)
         Iat = self.calc_atomic_intensity(atoms)
-        sm0 = self.qfit * (self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0]) / Iat)
-        sm0 = np.real(sm0)
+        Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
+        I0 = Iat + Imol0
         signals = []
+
+        sM0 = self.qfit * (self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0]) / Iat)
+        sM0 = np.real(sM0)
         pdfs = []
 
         # Calculate q grid in Angstroms for PDF
         q_ang = self.qfit / BH_TO_ANG
         r = q_ang.copy()
 
-        dt_fs = timestep_au / 40 * 0.9675537016  # Convert timestep to fs
+        dt_fs = timestep_au * AU_TO_FS  # Convert timestep to fs
         if tmax_fs is not None:
             n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
         else:
             n_frames = len(trajectory)
+
         for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
             # Check if we've reached the time limit
             current_time = i * dt_fs
@@ -603,15 +603,16 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
                 break
 
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            sm = self.qfit * (Imol / Iat)
-            sm = np.real(sm)
-            rel = sm - sm0
+            I = Iat + Imol
+            rel = (I - I0) / I0 * 100
+            signals.append(rel)
+
+            sM = np.real(self.qfit * (Imol / Iat))
+            dsM = sM - sM0
 
             # Calculate PDF for this frame using provided alpha
-            sm_ang = rel / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
-            pdf = self.FT(r, q_ang, sm_ang, pdf_alpha)
-
-            signals.append(rel)
+            sM_ang = dsM / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
+            pdf = self.FT(r, q_ang, sM_ang, pdf_alpha)
             pdfs.append(pdf)
 
         signal_raw = np.array(signals).T
