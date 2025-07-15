@@ -1,4 +1,5 @@
-# xed.py --ued --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out --log-to-file --plot
+# iamxed --ued --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued --log-to-file --plot
+# 	q			signal
 0.000000000000000000e+00 0.000000000000000000e+00
 1.001001001001000992e-02 1.000967965965786528e-02
 2.002002002002001985e-02 2.001737729569855878e-02

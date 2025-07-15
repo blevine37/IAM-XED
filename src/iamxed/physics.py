@@ -392,7 +392,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
         xyz_files = find_xyz_files(xyz_dir)
         all_Imol = []
-        all_Imol0 = []
         max_frames = 0
         dt_fs = timestep_au * AU_TO_FS
         Iat0 = None
@@ -400,8 +399,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
             if Iat0 is None:
                 Iat0 = self.calc_atomic_intensity(atoms)
-            Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
-            all_Imol0.append(Imol0)
             Imol_traj = []
             if tmax_fs is not None:
                 n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
@@ -438,8 +435,9 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         logger.info('* Trajectories shorter than tmax handled (not contributing to ensemble average for longer times than their duration).')
 
         # ensemble average
-        mean_Imol = np.nanmean(np.stack(padded_Imol, axis=0), axis=0)
-        mean_Imol0 = np.nanmean(np.stack(all_Imol0, axis=0), axis=0)
+        Imol_stacked = np.stack(padded_Imol, axis=0)  # [n_traj, q, t]
+        mean_Imol = np.nanmean(Imol_stacked, axis=0) # [q, t]
+        mean_Imol0 = np.nanmean(Imol_stacked[:,:,0], axis=0) # [q,] - average at t=0
         if Iat0 is None: # this should be unnecessary since we check we have some trajectory files
             logger.error(f"ERROR: No valid trajectories found to compute atomic intensity (Iat0).")
             raise ValueError("No valid trajectories found to compute atomic intensity (Iat0).")
@@ -447,14 +445,14 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
         numerator = mean_Imol - mean_Imol0[:, None] # [:, None] casts (N,) array to (N, 1) for element-wise operations
         denominator = Iat0[:, None] + mean_Imol0[:, None]
-        signal_raw = numerator / denominator * 100
+        dIoverI = numerator / denominator * 100
         logger.info('* Difference signal calculated by subtracting reference.')
 
         times = np.arange(max_frames) * dt_fs
-        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
+        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
         logger.info('* Temporal convolution with Gaussian kernel applied.')
 
-        return times, self.qfit, signal_raw, signal_smooth, None, None, None
+        return times, self.qfit, dIoverI, signal_smooth, None, None, None
 
 class UEDDiffractionCalculator(BaseDiffractionCalculator):
     """UED-specific calculator implementation."""
@@ -644,68 +642,94 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         all_Imol0 = []
         all_pdfs = []
         max_frames = 0
-        dt_fs = timestep_au / 40 * 0.9675537016
+        dt_fs = timestep_au * AU_TO_FS
         sfit = self.qfit
-        q_ang = self.qfit / BH_TO_ANG
+        q_ang = self.qfit * ANG_TO_BH # Convert q to Angstrom^-1 for PDF calculation
         r = q_ang.copy()
         Iat0 = None
-        all_s = []  # Will hold s_k(t) for each trajectory
+        all_sM = []  # Will hold s_k(t) for each trajectory
         for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Trajectory files', leave=False)):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
             if Iat0 is None:
                 Iat0 = self.calc_atomic_intensity(atoms)
-            s_traj = []
+            Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
+            all_Imol0.append(Imol0)
+            Imol_traj = []
+            sM_traj = []
             if tmax_fs is not None:
                 n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
             else:
                 n_frames = len(trajectory)
+            # Loop over frames
             for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
+                # Check if we've reached the time limit
                 current_time = i * dt_fs
                 if tmax_fs is not None and current_time > tmax_fs:
                     break
                 Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-                s = sfit * (Imol / Iat0)
-                s_traj.append(s)
-            s_traj = np.array(s_traj).T  # [q, t]
-            all_s.append(s_traj)
-            max_frames = max(max_frames, s_traj.shape[1])
+                Imol_traj.append(Imol)
+                sM = sfit * (Imol / Iat0)
+                sM_traj.append(sM)
+            Imol_traj = np.array(Imol_traj).T
+            all_Imol.append(Imol_traj)
+            sM_traj = np.array(sM_traj).T  # [q, t]
+            all_sM.append(sM_traj)
+            max_frames = max(max_frames, sM_traj.shape[1])
         logger.info('* Signal for individual trajectories calculated.')
 
         # getting trajectories ending prematurely
-        for idx, traj in enumerate(all_s):
+        for idx, traj in enumerate(all_Imol):
             traj_frames = traj.shape[1]
             if traj_frames < max_frames:
                 logger.warning(f" - Trajectory {xyz_files[idx]} has fewer frames ({traj_frames}) than the maximum ({max_frames}).")
 
-        # Pad all s to max_frames with NaN
-        padded_s = []
-        for s in all_s:
-            if s.shape[1] < max_frames:
-                pad_width = ((0, 0), (0, max_frames - s.shape[1]))
-                padded = np.pad(s, pad_width, mode='constant', constant_values=np.nan)
+        # Pad all sM and Imol to max_frames with NaN
+        # Padding Imol
+        padded_Imol = []
+        for Imol in all_Imol:
+            if Imol.shape[1] < max_frames:
+                pad_width = ((0, 0), (0, max_frames - Imol.shape[1]))
+                padded = np.pad(Imol, pad_width, mode='constant', constant_values=np.nan)
             else:
-                padded = s
-            padded_s.append(padded)
+                padded = Imol
+            padded_Imol.append(padded)
+        # Padding sM
+        padded_sM = []
+        for sM in all_sM:
+            if sM.shape[1] < max_frames:
+                pad_width = ((0, 0), (0, max_frames - sM.shape[1]))
+                padded = np.pad(sM, pad_width, mode='constant', constant_values=np.nan)
+            else:
+                padded = sM
+            padded_sM.append(padded)
         logger.info('* Trajectories shorter than tmax handled (not contributing to ensemble average for longer times than their duration).')
 
-        stacked_s = np.stack(padded_s, axis=0)  # [n_traj, q, t]
+        # ensemble average
+        Imol_stacked = np.stack(padded_Imol, axis=0)  # [n_traj, q, t]
+        mean_Imol = np.nanmean(Imol_stacked, axis=0) # [q, t]
+        mean_Imol0 = np.nanmean(Imol_stacked[:,:,0], axis=0) # [q,] - average at t=0
+        stacked_s = np.stack(padded_sM, axis=0)  # [n_traj, q, t]
         mean_s = np.nanmean(stacked_s, axis=0)   # [q, t]
-        mean_s0 = np.nanmean(stacked_s[:, :, 0], axis=0)  # [q]
-        # Final signal: mean_s(t) - mean_s(0)
-        signal_raw = np.real(mean_s - mean_s0[:, None])
+        mean_s0 = np.nanmean(stacked_s[:, :, 0], axis=0)  # [q] - average at t=0
         logger.info('* Signal averaged over trajectories.')
 
+        numerator = mean_Imol - mean_Imol0[:, None] # [:, None] casts (N,) array to (N, 1) for element-wise operations
+        denominator = Iat0[:, None] + mean_Imol0[:, None]
+        dIoverI = numerator / denominator * 100
+        logger.info('* Difference signal calculated by subtracting reference.')
+
         # Now calculate PDF from the final signal
-        sm_ang = signal_raw / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
-        pdfs_raw = np.empty((len(q_ang), signal_raw.shape[1]))
-        for t in range(signal_raw.shape[1]):
+        # Final signal: mean_s(t) - mean_s(0)
+        sm_ang = np.real(mean_s - mean_s0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
+        pdfs_raw = np.empty((len(q_ang), sm_ang.shape[1]))
+        for t in range(sm_ang.shape[1]):
             pdfs_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha)
         pdfs_raw = np.real(pdfs_raw)
         logger.info('* PDF calculated from averaged signal.')
 
         times = np.arange(max_frames) * dt_fs
-        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
+        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
         pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
         logger.info('* Temporal convolution with Gaussian kernel applied.')
         
-        return times, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth 
+        return times, self.qfit, dIoverI, signal_smooth, r, pdfs_raw, pdfs_smooth
