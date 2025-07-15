@@ -1,5 +1,5 @@
 # iamxed --xrd --calculation-type static --signal-geoms h2.xyz --qmin 0.0 --qmax 5.0 --npoints 500 --export xrd_elastic --log-to-file --plot
-# 	q			signal
+# 	q			I
 0.000000000000000000e+00 4.000000000000000000e+00
 1.002004008016032024e-02 4.000302644666235530e+00
 2.004008016032064049e-02 3.999457226927888520e+00

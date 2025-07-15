@@ -502,13 +502,14 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             """Calculate signal and PDF for a single geometry."""
             Iat = self.calc_atomic_intensity(atoms)
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
+            I = np.real(Iat + Imol)  # Total intensity
             sm = self.qfit * (Imol / Iat)
             sm_real = np.real(sm)
             q_ang = self.qfit / BH_TO_ANG
             sm_ang = sm_real / BH_TO_ANG
             r = q_ang.copy()
             pdf = self.FT(r, q_ang, sm_ang, pdf_alpha)
-            return sm_real, r, pdf
+            return I, sm_real, r, pdf
 
         if os.path.isdir(geom_file):
             xyz_files = find_xyz_files(geom_file)
@@ -516,8 +517,8 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             pdfs = []
             for f in xyz_files:
                 atoms, coords = read_xyz(f) #Note: Currently expects single frame files
-                sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
-                signals.append(sm_real)
+                I, sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
+                signals.append(I)
                 pdfs.append(pdf)
             avg_signal = np.mean(signals, axis=0)
             avg_pdf = np.mean(pdfs, axis=0)
@@ -527,17 +528,17 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             signals = []
             pdfs = []
             for coords in trajectory:
-                sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
-                signals.append(sm_real)
+                I, sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
+                signals.append(I)
                 pdfs.append(pdf)
             avg_signal = np.mean(signals, axis=0)
             avg_pdf = np.mean(pdfs, axis=0)
             return self.qfit, avg_signal, r, avg_pdf
         else:
             atoms, coords = read_xyz(geom_file)
-            sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
+            I, sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
 
-            return self.qfit, sm_real, r, pdf
+            return self.qfit, I, r, pdf
 
     def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate difference between two geometries and its PDF.
@@ -547,15 +548,15 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         """
         # Get signals and PDFs for both inputs using calc_single
         logger.info("* Signal calculation")
-        _, sm1, r1, pdf1 = self.calc_single(geom1, pdf_alpha)
+        _, I1, r1, pdf1 = self.calc_single(geom1, pdf_alpha)
         logger.info("* Reference calculation")
-        _, sm2, r2, pdf2 = self.calc_single(geom2, pdf_alpha)
+        _, I2, r2, pdf2 = self.calc_single(geom2, pdf_alpha)
 
         logger.info("* Difference calculation")
-        sm_diff = sm1 - sm2 # Calculate difference signal and PDF
+        dIoverI = (I1 - I2) / I2 * 100  # dI/I
         pdf_diff = pdf1 - pdf2  # Calculate PDF difference
 
-        return self.qfit, sm_diff, r1, pdf_diff
+        return self.qfit, dIoverI, r1, pdf_diff
 
     def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate time-resolved UED pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.

@@ -166,7 +166,7 @@ def iamxed(args: Namespace):
                 logger.info('Starting static difference calculation.')
                 q, diff_signal, r, diff_pdf = calculator.calc_difference(args.signal_geoms, args.reference_geoms)
                 if args.export:
-                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=diff_signal, r=r, pdfs=diff_pdf)
+                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=diff_signal, r=r, pdfs=diff_pdf, diff=True)
             elif args.calculation_type == 'time-resolved':
                 # todo: tr with explicit reference
                 logger.error('ERROR: Time-resolved calculations with a reference are not supported.')
@@ -176,7 +176,7 @@ def iamxed(args: Namespace):
                 logger.info('Starting static signal calculation.')
                 q, signal, r, pdf = calculator.calc_single(args.signal_geoms)
                 if args.export:
-                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=signal, r=r, pdfs=pdf)
+                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=signal, r=r, pdfs=pdf, diff=False)
             elif args.calculation_type == 'time-resolved':
                 if signal_geom_type == 'directory':
                     logger.info('Starting time-resolved calculation for an ensemble of trajectories.')

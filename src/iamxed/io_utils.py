@@ -169,14 +169,16 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
     return sorted(elements)
 
 
-def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: np.ndarray, r: np.ndarray = None, pdfs: np.ndarray = None):
+def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: np.ndarray, r: np.ndarray = None, pdfs: np.ndarray = None, diff: bool = False):
     """Export static data to a file in a npz format suitable for further analysis."""
     cmd_options = ' '.join(flags_list)
-    comment = f"# iamxed {cmd_options}\n"
-    np.savetxt(filename+'.txt', np.column_stack((q, signal)), comments=comment, header='# \tq\t\t\tsignal') # todo: add units and should be probably dI/I
+    comment = f"iamxed {cmd_options}\n"
+    header = '\tq\t\t\tdI/I' if diff else  '\tq\t\t\tI' # Header for the output file
+    np.savetxt(filename+'.txt', np.column_stack((q, signal)), header=comment+header) # todo: add units
     logger.info(f"Exporting static data to '{filename}.txt'.")
     if r is not None and pdfs is not None:
-        np.savetxt(filename + '_PDF.txt', np.column_stack((r, pdfs)), comments=comment, header='# \tr\t\t\tPDF') # todo: add units
+        header = '\tq\t\t\tdPDFI' if diff else '\tq\t\t\tPDF'  # Header for the output file
+        np.savetxt(filename + '_PDF.txt', np.column_stack((r, pdfs)), header=comment+header) # todo: add units
         logger.info(f"Exporting PDF data to '{filename}_PDF.txt'.")
 
 
