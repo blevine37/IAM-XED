@@ -180,7 +180,7 @@ def iamxed(args: Namespace):
             elif args.calculation_type == 'time-resolved':
                 if signal_geom_type == 'directory':
                     logger.info('Starting time-resolved calculation for an ensemble of trajectories.')
-                    times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_ensemble(
+                    times, q, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_ensemble(
                         args.signal_geoms,
                         timestep_au=args.timestep,
                         fwhm_fs=args.fwhm,
@@ -189,7 +189,7 @@ def iamxed(args: Namespace):
                     )
                 else:
                     logger.info('Starting time-resolved calculation for a single trajectory.')
-                    times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_trajectory(
+                    times, q, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_trajectory(
                         args.signal_geoms,
                         timestep_au=args.timestep,
                         fwhm_fs=args.fwhm,
@@ -197,7 +197,6 @@ def iamxed(args: Namespace):
                         tmax_fs=args.tmax
                     )
                 # Get smoothed time axis for smoothed data
-                _, times_smooth = calculator.gaussian_smooth_2d_time(signal_raw, times, args.fwhm)
                 if args.export:
                     if args.ued:  # Include PDFs for UED only
                         export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,

@@ -373,7 +373,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         pdfs_raw = np.zeros((1, signal_raw.shape[1]))  # Dummy raw PDFs
         pdfs_smooth = np.zeros((1, signal_smooth.shape[1]))  # Dummy smoothed PDFs
 
-        return times_smooth, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth
+        return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth
 
     def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate ensemble average of trajectories.
@@ -452,7 +452,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
         logger.info('* Temporal convolution with Gaussian kernel applied.')
 
-        return times, self.qfit, dIoverI, signal_smooth, None, None, None
+        return times, self.qfit, dIoverI, times_smooth, signal_smooth, None, None, None
 
 class UEDDiffractionCalculator(BaseDiffractionCalculator):
     """UED-specific calculator implementation."""
@@ -624,7 +624,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
         pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
 
-        return times, self.qfit, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth
+        return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth
 
     def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> tuple:
         """Calculate ensemble-averaged signal and PDF from a directory of trajectories, matching the interface of calc_trajectory.
@@ -732,4 +732,4 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
         logger.info('* Temporal convolution with Gaussian kernel applied.')
         
-        return times, self.qfit, dIoverI, signal_smooth, r, pdfs_raw, pdfs_smooth
+        return times, self.qfit, dIoverI, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth
