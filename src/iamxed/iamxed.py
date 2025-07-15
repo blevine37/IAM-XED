@@ -65,7 +65,7 @@ def iamxed(args: Namespace):
             logger.info(f"- {key:20s}: {value}  {add}")
 
         # Print calculation introduction
-        output = '\nCALCULATION\n-----------\n'
+        output = '\nINITIALIZATION\n--------------\n'
         if args.calculation_type == 'static':
             output += 'Static '
         elif args.calculation_type == 'time-resolved':
@@ -159,25 +159,27 @@ def iamxed(args: Namespace):
     logger.debug("[DEBUG]: Calculator initialized.")
 
     # Perform calculation based on type
+    logger.info('\nCALCULATION\n-----------')
     try:
         if args.reference_geoms:
             if args.calculation_type == 'static':
-                logger.info('Performing static difference calculation...')
+                logger.info('Starting static difference calculation.')
                 q, diff_signal, r, diff_pdf = calculator.calc_difference(args.signal_geoms, args.reference_geoms)
                 if args.export:
-                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=diff_signal)
+                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=diff_signal, r=r, pdfs=diff_pdf)
             elif args.calculation_type == 'time-resolved':
+                # todo: tr with explicit reference
                 logger.error('ERROR: Time-resolved calculations with a reference are not supported.')
                 return 1
         else:
             if args.calculation_type == 'static':
-                logger.info('Performing static calculation...')
+                logger.info('Starting static signal calculation.')
                 q, signal, r, pdf = calculator.calc_single(args.signal_geoms)
                 if args.export:
-                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=signal)
+                    export_static_data(filename=args.export, flags_list=argv[1:], q=q, signal=signal, r=r, pdfs=pdf)
             elif args.calculation_type == 'time-resolved':
-                logger.info('Performing time-resolved calculation...')
                 if signal_geom_type == 'directory':
+                    logger.info('Starting time-resolved calculation for an ensemble of trajectories.')
                     times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_ensemble(
                         args.signal_geoms,
                         timestep_au=args.timestep,
@@ -186,6 +188,7 @@ def iamxed(args: Namespace):
                         tmax_fs=args.tmax
                     )
                 else:
+                    logger.info('Starting time-resolved calculation for a single trajectory.')
                     times, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_trajectory(
                         args.signal_geoms,
                         timestep_au=args.timestep,

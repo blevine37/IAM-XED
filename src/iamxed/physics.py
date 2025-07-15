@@ -235,11 +235,13 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
                 return s1
 
             def calc_s2(q, Z, d1, d2, d3, q1, t1, t2, t3):
-                s1 = calc_s1(q, d1, d2, d3) #todo: why not used?
+                # s1 = calc_s1(q, d1, d2, d3)
                 s1q1 = calc_s1(q1, d1, d2, d3)
                 g1 = 1 - np.exp(t1*(q1 - q))
                 g2 = 1 - np.exp(t3*(q1 - q))
-                # return (Z - s1 - t2)*g1 + t2*g2 + s1q1 #todo: this is according to Szaloki paper
+                # This is who Szaloki presents it in the paper but the functional form is obviously wrong
+                # return (Z - s1 - t2)*g1 + t2*g2 + s1q1
+                # This modified version of the code from Szaloki's paper gives right shape of inelastic signal
                 return (Z - s1q1 - t2)*g1 + t2*g2 + s1q1
 
             s = np.zeros_like(q)
@@ -298,10 +300,13 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         If either geom1 or geom2 is a directory or trajectory file, ensemble averaging will be performed.
         """
         # Get signals for both inputs using calc_single
+        logger.info("* Signal calculation")
         _, I1, _, _ = self.calc_single(geom1)
+        logger.info("* Reference calculation")
         _, I2, _, _ = self.calc_single(geom2)
         
         # Calculate relative difference in percent
+        logger.info("* Difference calculation")
         diff = (I1 - I2) / I2 * 100
         return self.qfit, diff, None, None
 
@@ -536,17 +541,16 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         If either geom1 or geom2 is a directory or trajectory file, ensemble averaging will be performed.
         """
         # Get signals and PDFs for both inputs using calc_single
+        logger.info("* Signal calculation")
         _, sm1, r1, pdf1 = self.calc_single(geom1, pdf_alpha)
+        logger.info("* Reference calculation")
         _, sm2, r2, pdf2 = self.calc_single(geom2, pdf_alpha)
-        
-        # Calculate difference signal and PDF
-        sm_diff = sm1 - sm2
-        
-        q_ang = r1 / 0.529177
-        sm_diff_ang = sm_diff / 0.529177
-        r_diff = r1  # Use same grid for r as q
-        pdf_diff = self.FT(r_diff, q_ang, sm_diff_ang, pdf_alpha)
-        return self.qfit, sm_diff, r_diff, pdf_diff
+
+        logger.info("* Difference calculation")
+        sm_diff = sm1 - sm2 # Calculate difference signal and PDF
+        pdf_diff = pdf1 - pdf2  # Calculate PDF difference
+
+        return self.qfit, sm_diff, r1, pdf_diff
 
     def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate time-resolved UED pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.

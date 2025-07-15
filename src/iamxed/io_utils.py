@@ -169,12 +169,15 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
     return sorted(elements)
 
 
-def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: np.ndarray):
+def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: np.ndarray, r: np.ndarray = None, pdfs: np.ndarray = None):
     """Export static data to a file in a npz format suitable for further analysis."""
     cmd_options = ' '.join(flags_list)
-    header = f"# iamxed {cmd_options}\n"
-    np.savetxt(filename+'.txt', np.column_stack((q, signal)), comments=header, header='# q    signal')
+    comment = f"# iamxed {cmd_options}\n"
+    np.savetxt(filename+'.txt', np.column_stack((q, signal)), comments=comment, header='# \tq\t\t\tsignal') # todo: add units and should be probably dI/I
     logger.info(f"Exporting static data to '{filename}.txt'.")
+    if r is not None and pdfs is not None:
+        np.savetxt(filename + '_PDF.txt', np.column_stack((r, pdfs)), comments=comment, header='# \tr\t\t\tPDF') # todo: add units
+        logger.info(f"Exporting PDF data to '{filename}_PDF.txt'.")
 
 
 def export_tr_data(args: argparse.Namespace, flags_list: list, times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
@@ -193,12 +196,7 @@ def export_tr_data(args: argparse.Namespace, flags_list: list, times: np.ndarray
         np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw,
             signal_smooth=signal_smooth)
         # todo: export readable files in txt
-    logger.info(f"Exporting all time-resolved data to '{args.export}.npz'.")
-
-
-
-# logger.info(f'Exporting time-resolved data to {args.export}...')
-
+    logger.info(f"Exporting all time-resolved data in binary format to '{args.export}.npz'.")
 
 def parse_cmd_args():
     """Parse command line arguments.
