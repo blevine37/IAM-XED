@@ -331,9 +331,11 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             pdfs_raw: Raw PDFs (dummy for XRD)
             pdfs_smooth: Gaussian smoothed PDFs (dummy for XRD)
         """
+        logger.info("* Fetching trajectory data.")
         atoms, trajectory = read_xyz_trajectory(trajfile)
-            
+
         # Calculate reference (t=0) intensities
+        logger.info("* Calculating reference intensity I0 = I(0).")
         Iat0 = self.calc_atomic_intensity(atoms)
         Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
         I0 = Iat0 + Imol0
@@ -347,6 +349,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             n_frames = len(trajectory)
 
         #Loop over frames
+        logger.info("* Calculating signal along the trajectory.")
         for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
             # Check if we've reached the time limit
             current_time = i * dt_fs
@@ -367,6 +370,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         times = np.arange(len(signals)) * dt_fs
 
         # Apply temporal smoothing
+        logger.info("* Convoluting the signal with Gaussian kernel.")
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
 
         return times, self.qfit, dIoverI, times_smooth, signal_smooth, None, None, None
@@ -391,6 +395,8 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         max_frames = 0
         dt_fs = timestep_au * AU_TO_FS
         Iat0 = None
+
+        logger.info('* Calculating signal for individual trajectories.')
         for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Trajectory files', leave=False)):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
             if Iat0 is None:
@@ -411,8 +417,8 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             Imol_traj = np.array(Imol_traj).T
             all_Imol.append(Imol_traj)
             max_frames = max(max_frames, Imol_traj.shape[1])
-        logger.info('* Signal for individual trajectories calculated.')
 
+        logger.info('* Handling trajectories shorter than tmax (not contributing to ensemble average for longer times than their duration).')
         # getting trajectories ending prematurely
         for idx, traj in enumerate(all_Imol):
             traj_frames = traj.shape[1]
@@ -428,9 +434,9 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             else:
                 padded = Imol
             padded_Imol.append(padded)
-        logger.info('* Trajectories shorter than tmax handled (not contributing to ensemble average for longer times than their duration).')
 
         # ensemble average
+        logger.info('* Averaging signal over the ensemble of trajectories.')
         Imol_stacked = np.stack(padded_Imol, axis=0)  # [n_traj, q, t]
         mean_Imol = np.nanmean(Imol_stacked, axis=0) # [q, t]
         mean_Imol0 = np.nanmean(Imol_stacked[:,:,0], axis=0) # [q,] - average at t=0
@@ -439,14 +445,14 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             raise ValueError("No valid trajectories found to compute atomic intensity (Iat0).")
         logger.info('* Signal averaged over trajectories.')
 
+        logger.info('* Calculating the difference signal by subtracting reference.')
         numerator = mean_Imol - mean_Imol0[:, None] # [:, None] casts (N,) array to (N, 1) for element-wise operations
         denominator = Iat0[:, None] + mean_Imol0[:, None]
         dIoverI = numerator / denominator * 100
-        logger.info('* Difference signal calculated by subtracting reference.')
 
+        logger.info('* Convoluting singal in time with Gaussian kernel.')
         times = np.arange(max_frames) * dt_fs
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
-        logger.info('* Temporal convolution with Gaussian kernel applied.')
 
         return times, self.qfit, dIoverI, times_smooth, signal_smooth, None, None, None
 
@@ -577,11 +583,17 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             pdfs_raw: Raw PDFs (not smoothed)
             pdfs_smooth: Gaussian smoothed PDFs
         """
+        logger.info("* Fetching trajectory data.")
         atoms, trajectory = read_xyz_trajectory(trajfile)
+
+        # Calculate reference (t=0) intensities
+        logger.info("* Calculating reference intensity I0 = I(0).")
         Iat = self.calc_atomic_intensity(atoms)
         Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
-        I0 = Iat + Imol0
+        I0 = np.real(Iat + Imol0)
+
         signals = []
+        dt_fs = timestep_au * AU_TO_FS  # Convert timestep to fs
 
         sM0 = self.qfit * (self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0]) / Iat)
         sM0 = np.real(sM0)
@@ -591,12 +603,12 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         q_ang = self.qfit / BH_TO_ANG
         r = q_ang.copy()
 
-        dt_fs = timestep_au * AU_TO_FS  # Convert timestep to fs
         if tmax_fs is not None:
             n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
         else:
             n_frames = len(trajectory)
 
+        logger.info("* Calculating signal along the trajectory.")
         for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
             # Check if we've reached the time limit
             current_time = i * dt_fs
@@ -604,7 +616,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
                 break
 
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            I = Iat + Imol
+            I = np.real(Iat + Imol)
             rel = (I - I0) / I0 * 100
             signals.append(rel)
 
@@ -623,6 +635,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         times = np.arange(len(signals)) * dt_fs
 
         # Smooth signals and PDFs separately
+        logger.info("* Convoluting the signal with Gaussian kernel.")
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
         pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
 
@@ -641,8 +654,6 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         """
         xyz_files = find_xyz_files(xyz_dir)
         all_Imol = []
-        all_Imol0 = []
-        all_pdfs = []
         max_frames = 0
         dt_fs = timestep_au * AU_TO_FS
         sfit = self.qfit
@@ -650,12 +661,12 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         r = q_ang.copy()
         Iat0 = None
         all_sM = []  # Will hold s_k(t) for each trajectory
+
+        logger.info('* Calculating signal for individual trajectories.')
         for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Trajectory files', leave=False)):
             atoms, trajectory = read_xyz_trajectory(xyz_file)
             if Iat0 is None:
                 Iat0 = self.calc_atomic_intensity(atoms)
-            Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
-            all_Imol0.append(Imol0)
             Imol_traj = []
             sM_traj = []
             if tmax_fs is not None:
@@ -677,8 +688,8 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             sM_traj = np.array(sM_traj).T  # [q, t]
             all_sM.append(sM_traj)
             max_frames = max(max_frames, sM_traj.shape[1])
-        logger.info('* Signal for individual trajectories calculated.')
 
+        logger.info('* Handling trajectories shorter than tmax (not contributing to ensemble average for longer times than their duration).')
         # getting trajectories ending prematurely
         for idx, traj in enumerate(all_Imol):
             traj_frames = traj.shape[1]
@@ -704,34 +715,33 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             else:
                 padded = sM
             padded_sM.append(padded)
-        logger.info('* Trajectories shorter than tmax handled (not contributing to ensemble average for longer times than their duration).')
 
         # ensemble average
+        logger.info('* Averaging signal over the ensemble of trajectories.')
         Imol_stacked = np.stack(padded_Imol, axis=0)  # [n_traj, q, t]
         mean_Imol = np.nanmean(Imol_stacked, axis=0) # [q, t]
         mean_Imol0 = np.nanmean(Imol_stacked[:,:,0], axis=0) # [q,] - average at t=0
         stacked_s = np.stack(padded_sM, axis=0)  # [n_traj, q, t]
         mean_s = np.nanmean(stacked_s, axis=0)   # [q, t]
         mean_s0 = np.nanmean(stacked_s[:, :, 0], axis=0)  # [q] - average at t=0
-        logger.info('* Signal averaged over trajectories.')
 
+        logger.info('* Calculating the difference signal by subtracting reference.')
         numerator = mean_Imol - mean_Imol0[:, None] # [:, None] casts (N,) array to (N, 1) for element-wise operations
         denominator = Iat0[:, None] + mean_Imol0[:, None]
         dIoverI = numerator / denominator * 100
-        logger.info('* Difference signal calculated by subtracting reference.')
 
         # Now calculate PDF from the final signal
         # Final signal: mean_s(t) - mean_s(0)
+        logger.info('* Calculating PDF from averaged signal.')
         sm_ang = np.real(mean_s - mean_s0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
         pdfs_raw = np.empty((len(q_ang), sm_ang.shape[1]))
         for t in range(sm_ang.shape[1]):
             pdfs_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha)
         pdfs_raw = np.real(pdfs_raw)
-        logger.info('* PDF calculated from averaged signal.')
 
+        logger.info('* Convoluting singal in time with Gaussian kernel.')
         times = np.arange(max_frames) * dt_fs
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
         pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
-        logger.info('* Temporal convolution with Gaussian kernel applied.')
-        
+
         return times, self.qfit, dIoverI, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth
