@@ -303,8 +303,8 @@ def parse_cmd_args():
                         help="Save output to 'iamxed.out'. Default: True.")
     out_sec.add_argument('--debug', action='store_true',
                         help="Print debug output. Default: False.")
-    out_sec.add_argument('--plot', action='store_false',
-                        help='Plot the results. Default: True.')
+    out_sec.add_argument('--plot-disable', action='store_true',
+                        help='Disable plotting the results. Default: False.')
     out_sec.add_argument('--plot-flip', action='store_true',
                         help='Flip x and y axes in all plot. Default: False.')
     out_sec.add_argument('--export', type=str,

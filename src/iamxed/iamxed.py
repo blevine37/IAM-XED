@@ -211,7 +211,7 @@ def iamxed(args: Namespace):
     logger.info('IAM-XED calculation complete!')
 
     # plot results
-    if args.plot:
+    if not args.plot_disable:
         logger.info("\nPLOTTING\n--------")
         try:
             if args.reference_geoms:
