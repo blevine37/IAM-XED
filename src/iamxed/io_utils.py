@@ -6,7 +6,7 @@ import numpy as np
 import logging
 import argparse
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logger:
     """Set up the logger for output messages."""
@@ -169,16 +169,32 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
     return sorted(elements)
 
 
-def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: np.ndarray, r: np.ndarray = None, pdfs: np.ndarray = None, diff: bool = False):
+def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: np.ndarray, r: Optional[np.ndarray] = None, pdfs: Optional[np.ndarray] = None, diff: bool = False, is_ued: bool = False):
     """Export static data to a file in a npz format suitable for further analysis."""
     cmd_options = ' '.join(flags_list)
     comment = f"iamxed {cmd_options}\n"
-    header = '\tq\t\t\tdI/I' if diff else  '\tq\t\t\tI' # Header for the output file
-    np.savetxt(filename+'.txt', np.column_stack((q, signal)), header=comment+header) # todo: add units
+    
+    if is_ued: #UED
+        if diff:
+            #header = '\ts (Bohr⁻¹)\t\tΔsM(s) (Bohr⁻¹)'
+            header = '\tq (Bohr⁻¹)\t\tdI/I (%)'
+        else:
+            header = '\ts (Bohr⁻¹)\t\tsM(s) (Bohr⁻¹)'
+
+    else:  # XRD
+        if diff:
+            header = '\tq (Bohr⁻¹)\t\tdI/I (%)'
+        else:
+            header = '\tq (Bohr⁻¹)\t\tI (arb. units)'
+    
+    np.savetxt(filename+'.txt', np.column_stack((q, signal)), header=comment+header)
     logger.info(f"Exporting static data to '{filename}.txt'.")
     if r is not None and pdfs is not None:
-        header = '\tq\t\t\tdPDFI' if diff else '\tq\t\t\tPDF'  # Header for the output file
-        np.savetxt(filename + '_PDF.txt', np.column_stack((r, pdfs)), header=comment+header) # todo: add units
+        if diff:
+            pdf_header = '\tr (Å)\t\t\tΔPDF (arb. units)'
+        else:
+            pdf_header = '\tr (Å)\t\t\tPDF (arb. units)'
+        np.savetxt(filename + '_PDF.txt', np.column_stack((r, pdfs)), header=comment+pdf_header)
         logger.info(f"Exporting PDF data to '{filename}_PDF.txt'.")
 
 

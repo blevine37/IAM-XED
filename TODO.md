@@ -11,9 +11,9 @@
   - [x] ued time-resolved signal from trajectory
   - [x] xrd time-resolved signal from ensemble
   - [x] ued time-resolved signal from ensemble
-- [ ] Form factor db restructuralize
-- [ ] Correct momentum transfer labels q, s
-- [ ] Checking units in plot labels
+- [x] Form factor db restructuralize
+- [x] Correct momentum transfer labels q, s
+- [x] Checking units in plot labels
 
 ### Additional: 
 - [x] Log to file option, debug option

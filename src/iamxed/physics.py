@@ -24,7 +24,6 @@ logger = getLogger("my_logger") # getting logger
 # Physical constants
 ANG_TO_BH = 1.8897259886
 BH_TO_ANG = 1 / ANG_TO_BH
-S_TO_Q = 4 * np.pi
 CM_TO_BOHR = 188972598.85789
 AU_TO_FS = 0.02418884254
 
@@ -182,7 +181,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             data = XSF_DATA[el]
             
             # Convert units: sin(theta)/lambda in Ang^-1 to q in atomic units
-            q_vals = data[:, 0] * S_TO_Q / ANG_TO_BH
+            q_vals = data[:, 0] * (4 * np.pi) / ANG_TO_BH # 4 * np.pi is the conversion factor for Szaloki's definition of q
             f_vals = data[:, 1]
             
             # Create interpolation function
@@ -260,7 +259,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         inel = calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, self.qfit * ANG_TO_BH / (4 * np.pi))
         return inel
 
-    def calc_single(self, geom_file: str) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         """Calculate single geometry XRD pattern, or average over all geometries in a directory or trajectory file."""
         if os.path.isdir(geom_file): # getting first geometry from all files in directory
             xyz_files = find_xyz_files(geom_file)
@@ -290,7 +289,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             Itot = Iat + Imol
             return self.qfit, Itot, None, None
 
-    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
         """Calculate difference between two geometries.
 
         pdf_alpha: Damping parameter for PDF calculation (currently unused in XRD but kept for future development).
@@ -552,6 +551,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         """
         # Get signals and PDFs for both inputs using calc_single
         logger.info("* Signal calculation")
+
         _, I1, r1, pdf1 = self.calc_single(geom1, pdf_alpha)
         logger.info("* Reference calculation")
         _, I2, r2, pdf2 = self.calc_single(geom2, pdf_alpha)
