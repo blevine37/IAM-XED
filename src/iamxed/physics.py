@@ -46,16 +46,15 @@ class BaseDiffractionCalculator(ABC):
         
     def calc_molecular_intensity(self, aafs: List[np.ndarray], coords: np.ndarray) -> np.ndarray:
         """Calculate molecular intensity."""
-        # XRD is real-valued, UED is complex
-        Imol = np.zeros_like(self.qfit, dtype=float if isinstance(self, XRDDiffractionCalculator) else complex)
+        Imol = np.zeros_like(self.qfit, dtype=float)
         for i, (i_aaf, i_p) in enumerate(zip(aafs, coords)):
             for j, (j_aaf, j_p) in enumerate(zip(aafs, coords)):
-                if i == j:
+                if j <= i:
                     continue
                 r_ij = np.linalg.norm(i_p - j_p)
                 qr = self.qfit * r_ij
                 sinc_term = np.sinc(qr / np.pi) # qr / np.pi to remove normalization factor
-                Imol += np.conjugate(i_aaf) * j_aaf * sinc_term # np.conjugate is used for UED to handle complex form factors but does not affect floats in XRD
+                Imol += 2 * np.real(np.conjugate(i_aaf) * j_aaf * sinc_term) # np.conjugate is used for UED to handle complex form factors but does not affect floats in XRD
         return Imol
 
     @staticmethod
@@ -493,11 +492,11 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
     def calc_atomic_intensity(self, atoms: List[str]) -> np.ndarray:
         """Calculate atomic intensity for UED."""
-        Iat = np.zeros_like(self.qfit, dtype=complex)
+        Iat = np.zeros_like(self.qfit, dtype=float)
         for atom in atoms:
             ff = self.form_factors[atom]  # Complex form factor
-            Iat += ff * np.conjugate(ff)  # Multiply by conjugate to get real intensity
-        return np.real(Iat)  # Return real part since intensity must be real
+            Iat += np.real(ff * np.conjugate(ff))  # Multiply by conjugate to get real intensity
+        return Iat
 
     def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry UED pattern and PDF, or average over all geometries in a directory or trajectory file."""
@@ -508,14 +507,13 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             """Calculate signal and PDF for a single geometry."""
             Iat = self.calc_atomic_intensity(atoms)
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            I = np.real(Iat + Imol)  # Total intensity
+            I = Iat + Imol  # Total intensity
             sm = self.qfit * (Imol / Iat)
-            sm_real = np.real(sm)
             q_ang = self.qfit / BH_TO_ANG
-            sm_ang = sm_real / BH_TO_ANG
+            sm_ang = sm / BH_TO_ANG
             r = q_ang.copy()
             pdf = self.FT(r, q_ang, sm_ang, pdf_alpha)
-            return I, sm_real, r, pdf
+            return I, sm, r, pdf
 
         if os.path.isdir(geom_file):
             xyz_files = find_xyz_files(geom_file)
@@ -523,7 +521,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             pdfs = []
             for f in xyz_files:
                 atoms, coords = read_xyz(f) #Note: Currently expects single frame files
-                I, sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
+                I, _, r, pdf = calculate_signal_and_pdf(atoms, coords)
                 signals.append(I)
                 pdfs.append(pdf)
             avg_signal = np.mean(signals, axis=0)
@@ -534,7 +532,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             signals = []
             pdfs = []
             for coords in trajectory:
-                I, sm_real, r, pdf = calculate_signal_and_pdf(atoms, coords)
+                I, _, r, pdf = calculate_signal_and_pdf(atoms, coords)
                 signals.append(I)
                 pdfs.append(pdf)
             avg_signal = np.mean(signals, axis=0)
@@ -590,13 +588,12 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         logger.info("* Calculating reference intensity I0 = I(0).")
         Iat = self.calc_atomic_intensity(atoms)
         Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
-        I0 = np.real(Iat + Imol0)
+        I0 = Iat + Imol0
 
         signals = []
         dt_fs = timestep_au * AU_TO_FS  # Convert timestep to fs
 
-        sM0 = self.qfit * (self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0]) / Iat)
-        sM0 = np.real(sM0)
+        sM0 = self.qfit * (Imol0 / Iat)
         pdfs = []
 
         # Calculate q grid in Angstroms for PDF
@@ -616,11 +613,11 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
                 break
 
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            I = np.real(Iat + Imol)
+            I = Iat + Imol
             rel = (I - I0) / I0 * 100
             signals.append(rel)
 
-            sM = np.real(self.qfit * (Imol / Iat))
+            sM = self.qfit * (Imol / Iat)
             dsM = sM - sM0
 
             # Calculate PDF for this frame using provided alpha
@@ -721,9 +718,9 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         Imol_stacked = np.stack(padded_Imol, axis=0)  # [n_traj, q, t]
         mean_Imol = np.nanmean(Imol_stacked, axis=0) # [q, t]
         mean_Imol0 = np.nanmean(Imol_stacked[:,:,0], axis=0) # [q,] - average at t=0
-        stacked_s = np.stack(padded_sM, axis=0)  # [n_traj, q, t]
-        mean_s = np.nanmean(stacked_s, axis=0)   # [q, t]
-        mean_s0 = np.nanmean(stacked_s[:, :, 0], axis=0)  # [q] - average at t=0
+        stacked_sM = np.stack(padded_sM, axis=0)  # [n_traj, q, t]
+        mean_sM = np.nanmean(stacked_sM, axis=0)   # [q, t]
+        mean_sM0 = np.nanmean(stacked_sM[:, :, 0], axis=0)  # [q] - average at t=0
 
         logger.info('* Calculating the difference signal by subtracting reference.')
         numerator = mean_Imol - mean_Imol0[:, None] # [:, None] casts (N,) array to (N, 1) for element-wise operations
@@ -733,11 +730,10 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         # Now calculate PDF from the final signal
         # Final signal: mean_s(t) - mean_s(0)
         logger.info('* Calculating PDF from averaged signal.')
-        sm_ang = np.real(mean_s - mean_s0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
+        sm_ang = np.real(mean_sM - mean_sM0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
         pdfs_raw = np.empty((len(q_ang), sm_ang.shape[1]))
         for t in range(sm_ang.shape[1]):
             pdfs_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha)
-        pdfs_raw = np.real(pdfs_raw)
 
         logger.info('* Convoluting singal in time with Gaussian kernel.')
         times = np.arange(max_frames) * dt_fs
