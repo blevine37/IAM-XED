@@ -203,16 +203,21 @@ def export_tr_data(args: argparse.Namespace, flags_list: list, times: np.ndarray
                    pdfs_smooth: np.ndarray = None):
     """Export time-resoloved data to a file in a npz format suitable for further analysis. UED exports PDFs as well."""
     cmd_options = ' '.join(flags_list)
-    header = f"# iamxed {cmd_options}\n"
+    metadata = [f"#Command: iamxed {cmd_options}"]
+    if args.ued:
+        metadata += ["#Units: times: fs, s: Bohr⁻¹, signals: dI/I (%), r: Å, pdfs: ΔPDF(r) (arb. units)"]
+    else:
+        metadata += ["#Units: times: fs, q: Bohr⁻¹, signals: dI/I (%)"]
+    metadata = np.array(metadata, dtype='U')
     if args.ued:  # Include PDFs for UED only
-        np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw,
-            signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth)
+        np.savez(args.export, times=times, times_smooth=times_smooth, s=q, signal_raw=signal_raw,
+            signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth, metadata=metadata)
         # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdfs_raw, pdfs_smooth)), comments=header, header='# q    PDF    convoluted PDF') # todo: add units
         # logger.info(f"Exporting time-resolved PDF to '{args.export}.npz'.")
         # todo: export readable files in txt
     else:
         np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw,
-            signal_smooth=signal_smooth)
+            signal_smooth=signal_smooth, metadata=metadata)
         # todo: export readable files in txt
     logger.info(f"Exporting all time-resolved data in binary format to '{args.export}.npz'.")
 
