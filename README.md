@@ -120,8 +120,8 @@ Reference geometries are used for calculating the difference signal in static ca
 | `--timestep` | Time step (atomic time units)                                                | 10.0                                    |
 | `--tmax` | Maximum time considered (fs)                                                 | None (up to the longest trajectory)     |
 | `--fwhm` | FWHM parameter for Gaussian temporal convolution (fs)                        | 150.0                                   |
-| `--pdf-alpha` | PDF damping parameter (Å$^2$)                                                | 0.04                                    |
-| `--qmin`, `--qmax` | Momentum transfer range $q$ (or $s$) (Bohr$^{-1}$)                           | $5.29\cdot 10^{-9}$, $5.29$             |
+| `--pdf-alpha` | PDF damping parameter (Å²)                                                | 0.04                                    |
+| `--qmin`, `--qmax` | Momentum transfer range $q$ (or $s$) (Bohr⁻¹)                           | $5.29\cdot 10^{-9}$, $5.29$             |
 | `--npoints` | Number of $q$-points                                                         | 200                                     |
 | `--log-to-file` | Log output to file along with console                                        | False                                   |
 | `--plot-disable` | Disable plotting of results                                                  | False                                   |
@@ -137,13 +137,13 @@ More details on each option can be found in the help message (`iamxed --help`).
 
 ### XRD Calculations
 
-*Momentum coordinate in plots and export is labeled 'q' for UED*
+*Momentum coordinate in plots and export is labeled 'q' for XRD*
 
 **Single Geometry:**
 ```bash
 iamxed --xrd --signal-geoms molecule.xyz
 ```
-Calculates scattering intensity $I(q)$ as a function of momentum transfer $q$ (Bohr$^{-1}$).
+Calculates scattering intensity $I(q)$ as a function of momentum transfer $q$ (Bohr⁻¹).
 
 **Difference Signal from Single Geometry:**
 ```bash
@@ -161,7 +161,7 @@ Includes Compton scattering using Szaloki parameters.
 ```bash
 iamxed --xrd --signal-geoms trajectory.xyz --calculation-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40
 ```
-Calculates the time-resolved relative difference scattering signal $\Delta I/I_0 (q,t)$ against the t=0 frame. Momentum coordinate divided to 100 points goes from 0.0 to 10.0 Bohr$^{-1}$. Timestep is assumed 40 a.t.u.
+Calculates the time-resolved relative difference scattering signal $\Delta I/I_0 (q,t)$ against the t=0 frame. Momentum coordinate divided to 100 points goes from 0.0 to 10.0 Bohr⁻¹. Timestep is assumed 40 a.t.u.
 
 **Time-resolved Ensemble Calulation:**
 ```bash
@@ -189,7 +189,7 @@ Calculates the relative difference signal: $\Delta I/I_0 = (I_1-I_0)/I_0 \cdot 1
 ```bash
 iamxed --ued --calculation-type time-resolved --signal-geoms trajectory.xyz --timestep 40 --fwhm 100 --pdf-alpha 0.04
 ```
-Calculates time-resolved relative difference signal $\Delta I/I_0 (q,t)$ and $\Delta P(q,t)$ against the $t=0$ frame. Timestep is set to 40 a.t.u., additional temporal smoothing with 100 fs FWHM Gaussian function, $\alpha$ smearing parameter at 0.04 Å$^{-2}$.
+Calculates time-resolved relative difference signal $\Delta I/I_0 (q,t)$ and $\Delta P(q,t)$ against the $t=0$ frame. Timestep is set to 40 a.t.u., additional temporal smoothing with 100 fs FWHM Gaussian function, $\alpha$ smearing parameter at 0.04 Å².
 
 **Time-resolved Ensemble Calulation:**
 ```bash
