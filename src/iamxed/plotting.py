@@ -170,13 +170,13 @@ def plot_time_resolved_pdf(times: np.ndarray, r: np.ndarray, pdfs: np.ndarray, s
         im = plt.imshow(pdfs.T, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
         plt.xlabel('r (Å)')
         plt.ylabel('Time (fs)')
-        plt.colorbar(im, label='ΔPDF(r) (arb. units)')
+        plt.colorbar(im, label='ΔPDF (arb. units)')
     else:
         extent = (t_min, t_max, r.min(), r.max())
         im = plt.imshow(pdfs, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
         plt.xlabel('Time (fs)')
         plt.ylabel('r (Å)')
-        plt.colorbar(im, label='ΔPDF(r) (arb. units)')
+        plt.colorbar(im, label='ΔPDF (arb. units)')
     title = 'Time-Resolved ΔPDF'
     if smoothed:
         title += f' (Smoothed, FWHM = {fwhm_fs:.0f} fs)'

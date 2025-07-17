@@ -169,7 +169,7 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
     return sorted(elements)
 
 
-def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, signal: np.ndarray, r: Optional[np.ndarray] = None, pdfs: Optional[np.ndarray] = None, diff: bool = False, is_ued: bool = False) -> None:
+def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, signal: np.ndarray, r: Optional[np.ndarray] = None, pdfs: Optional[np.ndarray] = None, diff: bool = False, is_ued: bool = False):
     """Export static data to a file in a npz format suitable for further analysis."""
     cmd_options = ' '.join(flags_list)
     comment = f"iamxed {cmd_options}\n"
@@ -200,7 +200,7 @@ def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, sign
 
 def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
                    signal_raw: np.ndarray, signal_smooth: np.ndarray, r: Optional[np.ndarray] = None, pdfs_raw: Optional[np.ndarray] = None,
-                   pdfs_smooth: Optional[np.ndarray] = None) -> None:
+                   pdfs_smooth: Optional[np.ndarray] = None):
     """Export time-resoloved data to a file in a npz format suitable for further analysis. UED exports PDFs as well."""
     cmd_options = ' '.join(flags_list)
     metadata = [f"#Command: iamxed {cmd_options}"]
