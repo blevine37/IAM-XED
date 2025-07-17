@@ -24,7 +24,6 @@ logger = getLogger("my_logger") # getting logger
 # Physical constants
 ANG_TO_BH = 1.8897259886
 BH_TO_ANG = 1 / ANG_TO_BH
-S_TO_Q = 4 * np.pi
 CM_TO_BOHR = 188972598.85789
 AU_TO_FS = 0.02418884254
 
@@ -182,7 +181,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             data = XSF_DATA[el]
             
             # Convert units: sin(theta)/lambda in Ang^-1 to q in atomic units
-            q_vals = data[:, 0] * S_TO_Q / ANG_TO_BH
+            q_vals = data[:, 0] * (4 * np.pi) / ANG_TO_BH # 4 * np.pi is the conversion factor for Szaloki's definition of q
             f_vals = data[:, 1]
             
             # Create interpolation function
@@ -197,9 +196,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             ff = self.form_factors[atom]
             Iat += ff ** 2
             if self.inelastic:
-                if self.Szaloki_params is None:
-                    logger.error("ERROR: Szaloki parameters not loaded for inelastic scattering.")
-                    raise RuntimeError("Szaloki parameters not loaded for inelastic scattering.")
                 # Add inelastic contribution
                 inel = self.calc_inelastic(atom)
                 Iat += inel
@@ -207,6 +203,11 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
     def calc_inelastic(self, element: str) -> np.ndarray:
         """Calculate inelastic scattering for given atomic number."""
+
+        # Ensure Szaloki parameters are loaded
+        if self.Szaloki_params is None:
+            logger.error("ERROR: Szaloki parameters not loaded for inelastic scattering.")
+            raise RuntimeError("Szaloki parameters not loaded for inelastic scattering.")
 
         def get_atomic_number(element: str) -> int:
             """Get atomic number for element."""
@@ -225,16 +226,16 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
                 logger.error(f"ERROR: Element '{element}' not found in periodic table (Z=1-98)")
                 raise ValueError(f"Element '{element}' not found in periodic table (Z=1-98)")
 
-        def calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, q):
+        def calc_inel(Z: float, d1: float, d2: float, d3: float, q1: float, t1: float, t2: float, t3: float, q: np.ndarray) -> np.ndarray:
             """Calculating inelastic scattering contribution."""
 
-            def calc_s1(q, d1, d2, d3):
+            def calc_s1(q: np.ndarray, d1: float, d2: float, d3: float) -> np.ndarray:
                 s1 = np.zeros_like(q)
                 for i, d in enumerate([d1, d2, d3]):
                     s1 += d*(np.exp(q) - 1)**(i + 1)
                 return s1
 
-            def calc_s2(q, Z, d1, d2, d3, q1, t1, t2, t3):
+            def calc_s2(q: np.ndarray, Z: float, d1: float, d2: float, d3: float, q1: float, t1: float, t2: float, t3: float) -> np.ndarray:
                 # s1 = calc_s1(q, d1, d2, d3)
                 s1q1 = calc_s1(q1, d1, d2, d3)
                 g1 = 1 - np.exp(t1*(q1 - q))
@@ -253,14 +254,22 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
         atomic_number = get_atomic_number(element)
 
-        atom_index = np.where(self.Szaloki_params[:, 0] == atomic_number)[0][0]
+        # Check if atomic number exists in Szaloki parameters
+        matching_indices = np.where(self.Szaloki_params[:, 0] == atomic_number)[0]
+        if len(matching_indices) == 0:
+            logger.error(f"ERROR: Inelastic scattering parameters not available for element '{element}' (Z={atomic_number}). "
+                        f"Szaloki parameters are only available for elements H through Md (Z=1-100).")
+            raise ValueError(f"Inelastic scattering parameters not available for element '{element}' (Z={atomic_number}). "
+                           f"Szaloki parameters are only available for elements H through Md (Z=1-100).")
+        
+        atom_index = matching_indices[0]
         params = self.Szaloki_params[atom_index]
         Z, d1, d2, d3, q1, t1, t2, t3, *_ = params
 
         inel = calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, self.qfit * ANG_TO_BH / (4 * np.pi))
         return inel
 
-    def calc_single(self, geom_file: str) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry XRD pattern, or average over all geometries in a directory or trajectory file."""
         if os.path.isdir(geom_file): # getting first geometry from all files in directory
             xyz_files = find_xyz_files(geom_file)
@@ -374,7 +383,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
         return times, self.qfit, dIoverI, times_smooth, signal_smooth, None, None, None
 
-    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate ensemble average of trajectories.
 
         Returns relative differences (I(t)-I(0))/I(0) * 100 as percentage.
@@ -503,7 +512,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         import os
         from .io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
 
-        def calculate_signal_and_pdf(atoms: List[str], coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        def calculate_signal_and_pdf(atoms: List[str], coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
             """Calculate signal and PDF for a single geometry."""
             Iat = self.calc_atomic_intensity(atoms)
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
@@ -552,6 +561,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         """
         # Get signals and PDFs for both inputs using calc_single
         logger.info("* Signal calculation")
+
         _, I1, r1, pdf1 = self.calc_single(geom1, pdf_alpha)
         logger.info("* Reference calculation")
         _, I2, r2, pdf2 = self.calc_single(geom2, pdf_alpha)
@@ -562,7 +572,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
         return self.qfit, dIoverI, r1, pdf_diff
 
-    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate time-resolved UED pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.
 
         Args:
@@ -638,7 +648,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
         return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth
 
-    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> tuple:
+    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate ensemble-averaged signal and PDF from a directory of trajectories, matching the interface of calc_trajectory.
         For each time point, average over all available trajectories.
 

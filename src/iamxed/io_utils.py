@@ -6,7 +6,7 @@ import numpy as np
 import logging
 import argparse
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logger:
     """Set up the logger for output messages."""
@@ -169,38 +169,58 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
     return sorted(elements)
 
 
-def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: np.ndarray, r: np.ndarray = None, pdfs: np.ndarray = None, diff: bool = False):
+def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, signal: np.ndarray, r: Optional[np.ndarray] = None, pdfs: Optional[np.ndarray] = None, diff: bool = False, is_ued: bool = False):
     """Export static data to a file in a npz format suitable for further analysis."""
     cmd_options = ' '.join(flags_list)
     comment = f"iamxed {cmd_options}\n"
-    header = '\tq\t\t\tdI/I' if diff else  '\tq\t\t\tI' # Header for the output file
-    np.savetxt(filename+'.txt', np.column_stack((q, signal)), header=comment+header) # todo: add units
+    
+    if is_ued: #UED
+        if diff:
+            header = '\ts (Bohr⁻¹)\t\tdI/I (%)'
+        else:
+            header = '\ts (Bohr⁻¹)\t\tI (arb. units)'
+
+    else:  # XRD
+        if diff:
+            header = '\tq (Bohr⁻¹)\t\tdI/I (%)'
+        else:
+            header = '\tq (Bohr⁻¹)\t\tI (arb. units)'
+    
+    np.savetxt(filename+'.txt', np.column_stack((q, signal)), header=comment+header)
     logger.info(f"Exporting static data to '{filename}.txt'.")
     if r is not None and pdfs is not None:
-        header = '\tq\t\t\tdPDFI' if diff else '\tq\t\t\tPDF'  # Header for the output file
-        np.savetxt(filename + '_PDF.txt', np.column_stack((r, pdfs)), header=comment+header) # todo: add units
+        if diff:
+            pdf_header = '\tr (Å)\t\t\tΔPDF (arb. units)'
+        else:
+            pdf_header = '\tr (Å)\t\t\tPDF (arb. units)'
+        np.savetxt(filename + '_PDF.txt', np.column_stack((r, pdfs)), header=comment+pdf_header)
         logger.info(f"Exporting PDF data to '{filename}_PDF.txt'.")
 
 
-def export_tr_data(args: argparse.Namespace, flags_list: list, times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
-                   signal_raw: np.ndarray, signal_smooth: np.ndarray, r: np.ndarray = None, pdfs_raw: np.ndarray = None,
-                   pdfs_smooth: np.ndarray = None):
+def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
+                   signal_raw: np.ndarray, signal_smooth: np.ndarray, r: Optional[np.ndarray] = None, pdfs_raw: Optional[np.ndarray] = None,
+                   pdfs_smooth: Optional[np.ndarray] = None):
     """Export time-resoloved data to a file in a npz format suitable for further analysis. UED exports PDFs as well."""
     cmd_options = ' '.join(flags_list)
-    header = f"# iamxed {cmd_options}\n"
+    metadata = [f"#Command: iamxed {cmd_options}"]
+    if args.ued:
+        metadata += ["#Units: times: fs, s: Bohr⁻¹, signals: dI/I (%), r: Å, pdfs: ΔPDF(r) (arb. units)"]
+    else:
+        metadata += ["#Units: times: fs, q: Bohr⁻¹, signals: dI/I (%)"]
+    metadata = np.array(metadata, dtype='U')
     if args.ued:  # Include PDFs for UED only
-        np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw,
-            signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth)
-        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdfs_raw, pdfs_smooth)), comments=header, header='# q    PDF    convoluted PDF') # todo: add units
+        np.savez(args.export, times=times, times_smooth=times_smooth, s=q, signal_raw=signal_raw,
+            signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth, metadata=metadata)
+        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdfs_raw, pdfs_smooth)), comments=header, header='# q    PDF    convoluted PDF')
         # logger.info(f"Exporting time-resolved PDF to '{args.export}.npz'.")
         # todo: export readable files in txt
     else:
         np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw,
-            signal_smooth=signal_smooth)
+            signal_smooth=signal_smooth, metadata=metadata)
         # todo: export readable files in txt
     logger.info(f"Exporting all time-resolved data in binary format to '{args.export}.npz'.")
 
-def parse_cmd_args():
+def parse_cmd_args() -> argparse.Namespace:
     """Parse command line arguments.
     Returns:
         Parsed arguments as a Namespace object.
@@ -269,8 +289,8 @@ def parse_cmd_args():
     general_sec.add_argument('--signal-geoms', type=validate_path, required=True,
                            help='Geometries for calculating signal (xyz file or directory containing set of xyz trajectory files).')
     general_sec.add_argument('--reference-geoms', type=validate_path,
-                           help='OPTIONAL: Reference geometries for difference calculation (xyz file or directory containing '
-                                'xyz files with a single geomtry). If no reference for time resolved calculation is provided, '
+                           help='OPTIONAL: Reference geometries for difference calculation in the static mode (xyz file or directory containing '
+                                'xyz files with a single geomtry). Note that for a time resolved calculation, '
                                 'the first frame of the signal geometries will be used as reference.')
     
     # Signal type options
@@ -311,7 +331,7 @@ def parse_cmd_args():
                         help='Provide a file name to which calculated data will be exported. File will be named as'
                              ' <filename>.txt. Default: None.')
     out_sec.add_argument('--plot-units', type=str, default='bohr-1', choices=['bohr-1', 'angstrom-1'],
-                        help="Units for plotting the q axis: 'bohr-1' (default) or 'angstrom-1'.")
+                        help="Units for plotting the q axis, does not affect export: 'bohr-1' (default) or 'angstrom-1'.")
     
     # Grid parameters
     grid_sec = parser.add_argument_group("Grid parameters")

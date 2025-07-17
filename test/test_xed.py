@@ -35,8 +35,16 @@ def compare_output(output_file, reference_file, rtol=1e-5, atol=1e-8):
 def compare_npz(output_file, reference_file, rtol=1e-5, atol=1e-8):
     """Compare NPZ files."""
     with np.load(output_file) as output_data, np.load(reference_file) as reference_data:
-        assert set(output_data.keys()) == set(reference_data.keys()), "Different keys in NPZ files"
-        for key in output_data.keys():
+        output_keys = set(output_data.keys())
+        reference_keys = set(reference_data.keys())
+        
+        # Ignore metadata
+        output_keys.discard('metadata')
+        reference_keys.discard('metadata')
+        
+        assert output_keys == reference_keys, "Different keys in NPZ files"
+        
+        for key in output_keys:
             np.testing.assert_allclose(output_data[key], reference_data[key], 
                                       rtol=rtol, atol=atol,
                                       err_msg=f"Arrays differ for key '{key}'")

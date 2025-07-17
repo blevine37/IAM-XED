@@ -18,15 +18,21 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
         pdf: PDF values (optional)
         plot_flip: Whether to flip x and y axes
     """
-    # Convert units if needed
+    # Convert units for momentum transfer coordinate if needed
     if plot_units == 'angstrom-1':
         q_plot = q * 1.88973
-        signal_plot = signal / 0.529177 if not is_xrd else signal
-        x_label = 'q (Å⁻¹)'
+        signal_plot = signal #not converting / 0.529177 if not is_xrd else signal
+        if is_xrd:
+            x_label = 'q (Å⁻¹)' # XRD naming custom
+        else:
+            x_label = 's (Å⁻¹)' # UED naming custom
     else:
         q_plot = q
         signal_plot = signal
-        x_label = 'q (Bohr⁻¹)'
+        if is_xrd:
+            x_label = 'q (Bohr⁻¹)'
+        else:
+            x_label = 's (Bohr⁻¹)'
 
     plt.figure(figsize=(10, 6))
     if plot_flip:
@@ -35,23 +41,22 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
     else:
         plt.plot(q_plot, signal_plot, 'k-', linewidth=1.5)
         plt.xlabel(x_label)
+    #  Adding units for signal coordinate
     if is_xrd:
         if is_difference:
             label = 'ΔI/I₀ (%)'
-            title = 'XRD Difference Signal'
+            title = 'XRD Relative Difference Signal'
         else:
             label = 'I(q)'
             title = 'XRD Signal'
     else:
-        if plot_units == 'angstrom-1':
-            sm_unit = '(Å⁻¹)'
-        else:
-            sm_unit = '(Bohr⁻¹)'
+        #sm_unit = '(Bohr⁻¹)'
         if is_difference:
-            label = f'ΔsM(q) {sm_unit}'
-            title = 'UED Difference Signal'
+            #label = f'ΔsM(s) {sm_unit}'
+            label = 'ΔI/I₀ (%)'
+            title = 'UED Relative Difference Signal'
         else:
-            label = f'sM(q) {sm_unit}'
+            label = f'I(s)'
             title = 'UED Signal'
     if plot_flip:
         plt.xlabel(label)
@@ -60,21 +65,34 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
     plt.title(title)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
+    plt.savefig(f'signal.png', dpi=300)
     plt.show()
     # Plot PDF if provided
     if (r is not None) and (pdf is not None):
         plt.figure(figsize=(10, 6))
+        
+        # Determine labels and title based on difference type first
+        if is_difference:
+            title = 'Difference Pair Distribution Function (ΔPDF)'
+            label = 'ΔPDF (arb. units)'
+        else:
+            title = 'Pair Distribution Function (PDF)'
+            label = 'PDF (arb. units)'
+        
+        # Then handle plot orientation
         if plot_flip:
             plt.plot(pdf, r, 'b-', linewidth=1.5)
             plt.ylabel('r (Å)')
-            plt.xlabel('P(r)')
+            plt.xlabel(label)
         else:
             plt.plot(r, pdf, 'b-', linewidth=1.5)
             plt.xlabel('r (Å)')
-            plt.ylabel('P(r)')
-        plt.title('Pair Distribution Function (PDF)')
+            plt.ylabel(label)
+        
+        plt.title(title)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
+        plt.savefig(f'pdf.png', dpi=300)
         plt.show()
 
 def plot_time_resolved(times: np.ndarray, q: np.ndarray, signal: np.ndarray, is_xrd: bool, plot_units: str = 'bohr-1', smoothed: bool = False, fwhm_fs: float = 150.0, plot_flip: bool = False) -> None:
@@ -91,37 +109,44 @@ def plot_time_resolved(times: np.ndarray, q: np.ndarray, signal: np.ndarray, is_
     """
     if plot_units == 'angstrom-1':
         q_plot = q * 1.88973
-        signal_plot = signal / 0.529177 if not is_xrd else signal
-        q_label = 'q (Å⁻¹)'
-        sm_unit = '(Å⁻¹)' if not is_xrd else ''
+        signal_plot = signal #not converting / 0.529177 if not is_xrd else signal
+        if is_xrd:
+            x_label = 'q (Å⁻¹)' # XRD naming custom
+        else:
+            x_label = 's (Å⁻¹)' # UED naming custom
+        #sm_unit = '(Å⁻¹)' if not is_xrd else ''
     else:
         q_plot = q
         signal_plot = signal
-        q_label = 'q (Bohr⁻¹)'
-        sm_unit = '(Bohr⁻¹)' if not is_xrd else ''
+        if is_xrd:
+            x_label = 'q (Bohr⁻¹)'
+        else:
+            x_label = 's (Bohr⁻¹)'
+        #sm_unit = '(Bohr⁻¹)' if not is_xrd else ''
     vlim = np.nanmax(np.abs(signal_plot))
     divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
     plt.figure(figsize=(10, 6))
-    t_min = times.min() if smoothed else 0
+    t_min = times.min() #if smoothed else 0
     t_max = times.max()
     if plot_flip:
         # Transpose data, swap axes: x=q, y=time
         extent = (q_plot.min(), q_plot.max(), t_min, t_max)
         im = plt.imshow(signal_plot.T, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
-        plt.xlabel(q_label)
+        plt.xlabel(x_label)
         plt.ylabel('Time (fs)')
-        plt.colorbar(im, label=f'ΔI/I₀ (%)' if is_xrd else f'ΔsM(q) {sm_unit}')
+        plt.colorbar(im, label=f'ΔI/I₀ (%)')# if is_xrd else f'ΔsM(q) {sm_unit}')
     else:
         extent = (t_min, t_max, q_plot.min(), q_plot.max())
         im = plt.imshow(signal_plot, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
         plt.xlabel('Time (fs)')
-        plt.ylabel(q_label)
-        plt.colorbar(im, label=f'ΔI/I₀ (%)' if is_xrd else f'ΔsM(q) {sm_unit}')
+        plt.ylabel(x_label)
+        plt.colorbar(im, label=f'ΔI/I₀ (%)')# if is_xrd else f'ΔsM(q) {sm_unit}')
     if smoothed:
         plt.title(f'Time-Resolved {"XRD" if is_xrd else "UED"} Signal (Smoothed, FWHM={fwhm_fs} fs)')
     else:
         plt.title(f'Time-Resolved {"XRD" if is_xrd else "UED"} Signal')
     plt.tight_layout()
+    plt.savefig(f'time_resolved_signal{"_smoothed" if smoothed else ""}.png', dpi=300)
     plt.show()
 
 def plot_time_resolved_pdf(times: np.ndarray, r: np.ndarray, pdfs: np.ndarray, smoothed: bool = False, fwhm_fs: float = 150.0, plot_flip: bool = False) -> None:
@@ -145,14 +170,14 @@ def plot_time_resolved_pdf(times: np.ndarray, r: np.ndarray, pdfs: np.ndarray, s
         im = plt.imshow(pdfs.T, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
         plt.xlabel('r (Å)')
         plt.ylabel('Time (fs)')
-        plt.colorbar(im, label='ΔPDF(r) (arb. units)')
+        plt.colorbar(im, label='ΔPDF (arb. units)')
     else:
         extent = (t_min, t_max, r.min(), r.max())
         im = plt.imshow(pdfs, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
         plt.xlabel('Time (fs)')
         plt.ylabel('r (Å)')
-        plt.colorbar(im, label='ΔPDF(r) (arb. units)')
-    title = 'Time-Resolved PDF'
+        plt.colorbar(im, label='ΔPDF (arb. units)')
+    title = 'Time-Resolved ΔPDF'
     if smoothed:
         title += f' (Smoothed, FWHM = {fwhm_fs:.0f} fs)'
     plt.title(title)
