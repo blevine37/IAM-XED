@@ -208,7 +208,6 @@ def iamxed(args: Namespace):
     except Exception as e:
         logger.error(f"ERROR: Calculation issued exception: {str(e)}")
         return 1
-    logger.info('IAM-XED calculation complete!')
 
     # plot results
     if not args.plot_disable:
@@ -238,6 +237,8 @@ def iamxed(args: Namespace):
         except Exception as e:
             logger.error(f"ERROR: Plotting issued exception: {str(e)}")
             return 1
+
+    logger.info('\nIAM-XED calculation complete!')
     return 0
 
 if __name__ == '__main__':

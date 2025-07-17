@@ -128,6 +128,12 @@ iamxed --ued --calculation-type time-resolved --signal-geoms trajectory.xyz --ti
 ```
 Calculates time-resolved relative difference signal ΔI/I₀(s,t) and ΔPDF(r,t) against the t=0 frame. Timestep is set to 40 a.t.u., additional temporal smoothing with 100 fs FWHM Gaussian function, alpha smearing parameter at 0.04 Å².
 
+**Time-resolved Ensemble Calulation:**
+```bash
+iamxed --ued --calculation-type time-resolved --signal-geoms ./ensemble_dir/ --timestep 40 --fwhm 100 --pdf-alpha 0.04
+```
+Calculates the same signal as in trajectory case, averaging over all trajectories in the ./ensemble_dir/ folder.
+
 ### Key Options
 
 | Option | Description | Default |
@@ -200,16 +206,22 @@ params = {
     "signal_geoms": "./ensemble/",
     "reference_geoms": None,
     "calculation_type": "time-resolved",
-    "ued": False,
-    "xrd": True,
-    "inelastic": True,
+    "ued": True,
+    "xrd": False,
+    "inelastic": False,
     "qmin": 0,
     "qmax": 4,
-    "npoints": 100,
-    "timestep": 40.0,
-    "export": "xrd_ensemble",
+    "npoints": 200,
+    "timestep": 20.0,
+    "fwhm": 120.0,
+    "pdf_alpha": 0.04,
+    "tmax": False,
+    "export": "ued_ensemble",
     "log_to_file": False,
-    "debug": True,
+    "plot_disable": True,
+    "plot_flip": False,
+    "plot_units": "bohr-1",
+    "debug": True
 }
 
 params = Namespace(**params)
