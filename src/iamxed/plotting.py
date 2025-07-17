@@ -50,13 +50,13 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
             label = 'I(q)'
             title = 'XRD Signal'
     else:
-        sm_unit = '(Bohr⁻¹)'
+        #sm_unit = '(Bohr⁻¹)'
         if is_difference:
             #label = f'ΔsM(s) {sm_unit}'
             label = 'ΔI/I₀ (%)'
             title = 'UED Relative Difference Signal'
         else:
-            label = f'sM(s) {sm_unit}'
+            label = f'I(s)'
             title = 'UED Signal'
     if plot_flip:
         plt.xlabel(label)
@@ -74,10 +74,10 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
         # Determine labels and title based on difference type first
         if is_difference:
             title = 'Difference Pair Distribution Function (ΔPDF)'
-            label = 'ΔPDF(r) (arb. units)'
+            label = 'ΔPDF (arb. units)'
         else:
             title = 'Pair Distribution Function (PDF)'
-            label = 'PDF(r) (arb. units)'
+            label = 'PDF (arb. units)'
         
         # Then handle plot orientation
         if plot_flip:
