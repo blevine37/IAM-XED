@@ -176,10 +176,9 @@ def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, sign
     
     if is_ued: #UED
         if diff:
-            #header = '\ts (Bohr⁻¹)\t\tΔsM(s) (Bohr⁻¹)'
-            header = '\tq (Bohr⁻¹)\t\tdI/I (%)'
+            header = '\ts (Bohr⁻¹)\t\tdI/I (%)'
         else:
-            header = '\ts (Bohr⁻¹)\t\tsM(s) (Bohr⁻¹)'
+            header = '\ts (Bohr⁻¹)\t\tI (arb. units)'
 
     else:  # XRD
         if diff:
@@ -212,7 +211,7 @@ def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.nd
     if args.ued:  # Include PDFs for UED only
         np.savez(args.export, times=times, times_smooth=times_smooth, s=q, signal_raw=signal_raw,
             signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth, metadata=metadata)
-        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdfs_raw, pdfs_smooth)), comments=header, header='# q    PDF    convoluted PDF') # todo: add units
+        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdfs_raw, pdfs_smooth)), comments=header, header='# q    PDF    convoluted PDF')
         # logger.info(f"Exporting time-resolved PDF to '{args.export}.npz'.")
         # todo: export readable files in txt
     else:
@@ -290,8 +289,8 @@ def parse_cmd_args() -> argparse.Namespace:
     general_sec.add_argument('--signal-geoms', type=validate_path, required=True,
                            help='Geometries for calculating signal (xyz file or directory containing set of xyz trajectory files).')
     general_sec.add_argument('--reference-geoms', type=validate_path,
-                           help='OPTIONAL: Reference geometries for difference calculation (xyz file or directory containing '
-                                'xyz files with a single geomtry). If no reference for time resolved calculation is provided, '
+                           help='OPTIONAL: Reference geometries for difference calculation in the static mode (xyz file or directory containing '
+                                'xyz files with a single geomtry). Note that for a time resolved calculation, '
                                 'the first frame of the signal geometries will be used as reference.')
     
     # Signal type options
