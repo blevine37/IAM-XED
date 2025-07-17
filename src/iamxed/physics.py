@@ -224,16 +224,16 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
                 logger.error(f"ERROR: Element '{element}' not found in periodic table (Z=1-98)")
                 raise ValueError(f"Element '{element}' not found in periodic table (Z=1-98)")
 
-        def calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, q):
+        def calc_inel(Z: float, d1: float, d2: float, d3: float, q1: float, t1: float, t2: float, t3: float, q: np.ndarray) -> np.ndarray:
             """Calculating inelastic scattering contribution."""
 
-            def calc_s1(q, d1, d2, d3):
+            def calc_s1(q: np.ndarray, d1: float, d2: float, d3: float) -> np.ndarray:
                 s1 = np.zeros_like(q)
                 for i, d in enumerate([d1, d2, d3]):
                     s1 += d*(np.exp(q) - 1)**(i + 1)
                 return s1
 
-            def calc_s2(q, Z, d1, d2, d3, q1, t1, t2, t3):
+            def calc_s2(q: np.ndarray, Z: float, d1: float, d2: float, d3: float, q1: float, t1: float, t2: float, t3: float) -> np.ndarray:
                 # s1 = calc_s1(q, d1, d2, d3)
                 s1q1 = calc_s1(q1, d1, d2, d3)
                 g1 = 1 - np.exp(t1*(q1 - q))
@@ -259,7 +259,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         inel = calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, self.qfit * ANG_TO_BH / (4 * np.pi))
         return inel
 
-    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry XRD pattern, or average over all geometries in a directory or trajectory file."""
         if os.path.isdir(geom_file): # getting first geometry from all files in directory
             xyz_files = find_xyz_files(geom_file)
@@ -289,7 +289,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             Itot = Iat + Imol
             return self.qfit, Itot, None, None
 
-    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
+    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate difference between two geometries.
 
         pdf_alpha: Damping parameter for PDF calculation (currently unused in XRD but kept for future development).
@@ -373,7 +373,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
         return times, self.qfit, dIoverI, times_smooth, signal_smooth, None, None, None
 
-    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate ensemble average of trajectories.
 
         Returns relative differences (I(t)-I(0))/I(0) * 100 as percentage.
@@ -502,7 +502,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         import os
         from .io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
 
-        def calculate_signal_and_pdf(atoms: List[str], coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        def calculate_signal_and_pdf(atoms: List[str], coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
             """Calculate signal and PDF for a single geometry."""
             Iat = self.calc_atomic_intensity(atoms)
             Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
@@ -562,7 +562,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
         return self.qfit, dIoverI, r1, pdf_diff
 
-    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate time-resolved UED pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.
 
         Args:
@@ -638,7 +638,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
         return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth
 
-    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> tuple:
+    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate ensemble-averaged signal and PDF from a directory of trajectories, matching the interface of calc_trajectory.
         For each time point, average over all available trajectories.
 

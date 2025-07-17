@@ -169,7 +169,7 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
     return sorted(elements)
 
 
-def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: np.ndarray, r: Optional[np.ndarray] = None, pdfs: Optional[np.ndarray] = None, diff: bool = False, is_ued: bool = False):
+def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, signal: np.ndarray, r: Optional[np.ndarray] = None, pdfs: Optional[np.ndarray] = None, diff: bool = False, is_ued: bool = False) -> None:
     """Export static data to a file in a npz format suitable for further analysis."""
     cmd_options = ' '.join(flags_list)
     comment = f"iamxed {cmd_options}\n"
@@ -198,9 +198,9 @@ def export_static_data(filename: str, flags_list: list, q: np.ndarray, signal: n
         logger.info(f"Exporting PDF data to '{filename}_PDF.txt'.")
 
 
-def export_tr_data(args: argparse.Namespace, flags_list: list, times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
-                   signal_raw: np.ndarray, signal_smooth: np.ndarray, r: np.ndarray = None, pdfs_raw: np.ndarray = None,
-                   pdfs_smooth: np.ndarray = None):
+def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
+                   signal_raw: np.ndarray, signal_smooth: np.ndarray, r: Optional[np.ndarray] = None, pdfs_raw: Optional[np.ndarray] = None,
+                   pdfs_smooth: Optional[np.ndarray] = None) -> None:
     """Export time-resoloved data to a file in a npz format suitable for further analysis. UED exports PDFs as well."""
     cmd_options = ' '.join(flags_list)
     metadata = [f"#Command: iamxed {cmd_options}"]
@@ -221,7 +221,7 @@ def export_tr_data(args: argparse.Namespace, flags_list: list, times: np.ndarray
         # todo: export readable files in txt
     logger.info(f"Exporting all time-resolved data in binary format to '{args.export}.npz'.")
 
-def parse_cmd_args():
+def parse_cmd_args() -> argparse.Namespace:
     """Parse command line arguments.
     Returns:
         Parsed arguments as a Namespace object.
