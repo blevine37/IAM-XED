@@ -1,81 +1,196 @@
 # IAM-XED
-# Independent Atom Model - X-ray and Electron Diffraction code
+**Independent Atom Model for X-ray and Electron Diffraction**
 
-A Python package for calculating X-ray diffraction (XRD) and ultrafast electron diffraction (UED) patterns from molecular geometries and trajectories based on the Independent Atom Model (IAM).
+A Python package for calculating X-ray diffraction (XRD) and ultrafast electron diffraction (UED) signals from molecular geometries and trajectories using the Independent Atom Model (IAM) approximation.
+
+## Features
+
+- **XRD calculations** with optional inelastic scattering
+- **UED calculations** with pair distribution function (PDF) analysis
+- **Static and time-resolved** diffraction simulations
+- **Ensemble averaging** for multiple trajectories
+- **Difference calculations** for pump-probe experiments
+- **Flexible input formats** (single geometries, trajectories, ensembles)
 
 ## Installation
-The package can be installed from the source code. Clone the repository and run the following command in the root directory:
+
+### From Source (Recommended)
 ```bash
-git clone git@github.com:blevine37/IAM-XED.git
+git clone https://github.com/blevine37/IAM-XED.git
 cd IAM-XED
 pip install -e .
 ```
-Flag `-e` installs the package in editable mode, allowing you to modify the source code without reinstalling. 
-For common users, we recommend not using this flag.
 
-## Testing
-Run the tests to ensure everything is working correctly. Make sure you have pytest installed, then run in the root directory:
+The `-e` flag installs in editable mode for development. For regular use, omit this flag:
+```bash
+pip install .
+```
+
+### Dependencies
+Ensure you have Python ≥ 3.7 and the required packages:
+```bash
+pip install numpy scipy matplotlib tqdm pytest
+```
+
+### Testing
+Run the tests to ensure everything is 
+working correctly. 
+
 ```bash
 pytest -v
 ```
 
-## Input Files
-Note that all geometries should be in XYZ format and in Angstroms.
-### Signal Geometries TODO finish!!!!
-Keyword `--signal-geoms` is used to specify the input containing the molecular geometries for which the diffraction pattern is calculated. 
-Several types of input files are supported with different functionalities for static or time-resolved calculations:
-- single XYZ file:
-  - static calculation: all geometries in the file are averaged to calculate the static signal
-  - time-resolved calculation: the file is treated as a trajectory with a time step set by `--timestep`
-- folder with multiple XYZ files:
-  - static calculation: all files in the folder are averaged to calculate the static signal
-  - time-resolved calculation: each file is treated as a separate geometry at a different time step
+## Quick start
+
+
+### Input files: Signal Geometries (`--signal-geoms`)
+*All geometries must be in XYZ format with coordinates in Angstroms.*
+
+
+**Single XYZ file:**
+- **Static** (default): Takes the geometry or averages all geometries in the file and calculates static signal
+- **Time-resolved** (`--calculation-type time-resolved`): Treats all geometries in the file as a trajectory with `--timestep` intervals
+
+**Directory of XYZ files:**
+- **Static** (default): Averages first geometry from each file  
+- **Time-resolved** (`--calculation-type time-resolved`): Each XYZ file represents a trajectory with `--timestep` intervals to be averaged as an ensemble member
+
+**Examples:**
+```bash
+# Single molecule
+iamxed --xrd --signal-geoms molecule.xyz
+
+# Trajectory 
+iamxed --ued --calculation-type time-resolved --signal-geoms traj.xyz
+
+# Ensemble averaging
+iamxed --xrd --calculation-type time-resolved --signal-geoms ./ensemble_dir/
+```
 
 ## Usage
-Once the package is installed, you can use iamxed as a script
+
+See all available options:
 ```bash
 iamxed --help
 ```
 
-### Single Geometry XRD Calculation
+### XRD Calculations
+
+**Single Geometry:**
 ```bash
 iamxed --xrd --signal-geoms molecule.xyz
 ```
-Calculating the scattering signal in momentum coordinate q
+Calculates scattering intensity I(q) as a function of momentum transfer q (Bohr⁻¹)
 
-### Static difference XRD Calculation
-Calculating the scattering signal as a relative difference 
+**Difference Signal:**
 ```bash
-iamxed --xrd --signal-geoms molecule.xyz --reference-geoms molecule0.xyz
+iamxed --xrd --signal-geoms excited.xyz --reference-geoms ground.xyz
 ```
+Calculates the relative difference signal: ΔI/I₀ = (I₁-I₀)/I₀ × 100% (I₁ - signal-geoms, I₀ - reference-geoms)
 
-### Single Geometry UED Calculation
+**Inlcuding Inelastic Scattering:**
+```bash
+iamxed --xrd --signal-geoms molecule.xyz --inelastic
+```
+Includes Compton scattering using Szaloki parameters
+
+**Time-resolved Trajectory Calulation:**
+```bash
+iamxed --xrd --signal-geoms trajectory.xyz --calculation-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40
+```
+Calculates the time-resolved relative difference scattering signal ΔI/I₀(q,t) against the t=0 frame. Momentum coordinate divided to 100 points goes from 0.0 to 10.0 Bh-1. Timestep is assumed 40 a.t.u.
+
+**Time-resolved Ensemble Calulation:**
+```bash
+iamxed --xrd --signal-geoms ./ensemble_dir/ --calculation-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40 --tmax 500
+```
+Calculates the same signal as in trajectory case, averaging over all trajectories in the ./ensemble_dir/ folder up to 500 fs.
+
+### UED Calculations
+*Momentum coordinate in plots and export is labeled 's' for UED*
+
+**Single Geometry:**
 ```bash
 iamxed --ued --signal-geoms molecule.xyz
 ```
-Calculating the scattering signal as a modified scattering intensity sM(s)=s*Imol/Iat
+Calculates the modified scattering intensity sM(s) = s × I_mol/I_at and real-space pair distribution function PDF(r) =  r × ∫[s_min to s_max] sM(s) × sin(s × r) × exp(-alpha×s^2) ds. 
 
-### Static difference XRD Calculation
+
+**Difference Signal:**
 ```bash
-iamxed --ued --signal-geoms molecule.xyz --reference-geoms molecule0.xyz
+iamxed --ued --signal-geoms excited.xyz --reference-geoms ground.xyz
 ```
-Caclulating the difference signal as \Delta sM(s) = s*(\Delta Imol(s))/Iat(s)
+Calculates the relative difference signal: ΔI/I₀ = (I₁-I₀)/I₀ × 100% (I₁ - signal-geoms, I₀ - reference-geoms, I = sM(s)) and ΔPDF(r) = PDF₁(r)-PDF₀(r)
 
-### Time-Resolved UED Calculation
+**Time-Resolved Trajectory Calculation:**
 ```bash
-iamxed --ued --signal-geoms trajectory.xyz --calculation-type time-resolved
+iamxed --ued --calculation-type time-resolved --signal-geoms trajectory.xyz --timestep 40 --fwhm 100 --pdf-alpha 0.04
+```
+Calculates time-resolved relative difference signal ΔI/I₀(s,t) and ΔPDF(r,t) against the t=0 frame. Timestep is set to 40 a.t.u., additional temporal smoothing with 100 fs FWHM Gaussian function, alpha smearing parameter at 0.04 Å².
+
+### Key Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--calculation-type` | `static` or `time-resolved` | `static` |
+| `--qmin`, `--qmax` | Momentum transfer range (Bohr⁻¹) | 5.29e-9, 5.29 |
+| `--npoints` | Number of q-points | 200 |
+| `--timestep` | Time step (atomic time units) | 10.0 |
+| `--fwhm` | Temporal smoothing FWHM (fs) | 150.0 |
+| `--pdf-alpha` | PDF damping parameter (Å²) | 0.04 |
+| `--tmax` | Maximum time (fs) | None |
+| `--export` | Export data filename | None |
+| `--plot-units` | `bohr-1` or `angstrom-1` | `bohr-1` |
+| `--plot-flip` | Flip x and y axis | False |
+
+
+## Output Files
+
+### Static Calculations
+- `export.txt`: Signal data with units in header
+- `export_PDF.txt`: PDF data (UED only)
+
+### Time-Resolved Calculations  
+- `export.npz`: Binary archive containing:
+  - `times`, `times_smooth`: Time axis (fs)
+  - `q`/`s`: Momentum transfer axis (Bohr⁻¹) 
+  - `signal_raw`, `signal_smooth`: Diffraction signals
+  - `r`, `pdfs_raw`, `pdfs_smooth`: PDF data (UED only)
+  - `metadata`: Command and units information
+
+```python
+# Load time-resolved data
+import numpy as np
+data = np.load('results.npz')
+metadata = data['metadata']  # Command and units
+times = data['times']        # Time points (fs)
+signal = data['signal_raw']  # Raw signal
 ```
 
-### Additional Options
-- `--inelastic`: Include inelastic atomic contribution for XRD
-- `--fwhm`: FWHM for temporal Gaussian smoothing (fs)
-- `--pdf-alpha`: Damping parameter for PDF Fourier transform
-- `--plot`: Show plots
-- `--export`: Export calculated data to file
-- `--qmin`, `--qmax`, `--npoints`: Control q-grid parameters
+## Code Structure
 
-### Calling IAM-XED from Python
-You can also use IAM-XED as a library in your Python code. Here is an example of how to use it:
+```
+src/iamxed/
+├── iamxed.py      # Main entry point and CLI
+├── physics.py     # Calculator classes (XRD/UED)
+├── io_utils.py    # File I/O and argument parsing
+├── plotting.py    # Visualization functions
+├── XSF/           # X-ray scattering form factors
+└── ESF/           # Electron scattering form factors
+```
+
+## Dependencies
+
+- **Python** ≥ 3.7
+- **NumPy** - Array operations
+- **SciPy** - Interpolation and filtering  
+- **Matplotlib** - Plotting
+- **tqdm** - Progress bars
+- **pytest** - Testing (development)
+
+## Python API
+
+You can use IAM-XED as a library in your Python scripts:
 
 ```python
 from iamxed import iamxed
@@ -102,28 +217,39 @@ params = Namespace(**params)
 iamxed(params)
 ```
 
-## Code Structure
-The package is located in the `src/iamxed` directory and contains the following files:
-- `xed.py`: Main entry point and CLI
-- `physics.py`: Core physics calculations and calculator classes
-- `io_utils.py`: File I/O and utility functions
-- `plotting.py`: Plotting and visualization functions
-
-## Dependencies
-
-- Python >= 3.7
-- NumPy 
-- SciPy 
-- Matplotlib 
-- Pytest
-
 ## License
-MIT License
+
+MIT License - see LICENSE file for details.
 
 ## Authors
 
-Jiri Suchan
-Jiri Janos
+- **Jiri Suchan** 
+- **Jiri Janos**
 
 ## Citation
 
+If you use IAM-XED in your research, please cite:
+
+```bibtex
+@software{iam_xed,
+  title = {IAM-XED: Independent Atom Model for X-ray and Electron Diffraction},
+  author = {Suchan, Jiri and Janos, Jiri},
+  url = {https://github.com/blevine37/IAM-XED},
+  year = {2025}
+}
+```
+
+The IAM parameters for XRD reference:
+```
+Prince, E. (Ed.). (2004). International Tables for Crystallography, Volume C: Mathematical, physical and chemical tables. Springer Science & Business Media. 
+ISBN 1-4020-1900-9 
+```
+The IAM parameters for UED were calculated using the ELSEPA program assuming 3.7 MeV electron:
+```
+https://github.com/eScatter/elsepa (commit 98862ff)
+Salvat, F., Jablonski, A., & Powell, C. J. (2005). ELSEPA—Dirac partial-wave calculation of elastic scattering of electrons and positrons by atoms, positive ions and molecules. Computer physics communications, 165(2), 157-190.
+```
+The inelastic contribution parameters for UED reference:
+```
+Szalóki, I. (1996). Empirical equations for atomic form factor and incoherent scattering functions. X‐Ray Spectrometry, 25(1), 21-28.
+```

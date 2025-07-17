@@ -332,7 +332,7 @@ def parse_cmd_args():
                         help='Provide a file name to which calculated data will be exported. File will be named as'
                              ' <filename>.txt. Default: None.')
     out_sec.add_argument('--plot-units', type=str, default='bohr-1', choices=['bohr-1', 'angstrom-1'],
-                        help="Units for plotting the q axis: 'bohr-1' (default) or 'angstrom-1'.")
+                        help="Units for plotting the q axis, does not affect export: 'bohr-1' (default) or 'angstrom-1'.")
     
     # Grid parameters
     grid_sec = parser.add_argument_group("Grid parameters")
