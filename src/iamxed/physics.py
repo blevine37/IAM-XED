@@ -196,9 +196,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             ff = self.form_factors[atom]
             Iat += ff ** 2
             if self.inelastic:
-                if self.Szaloki_params is None:
-                    logger.error("ERROR: Szaloki parameters not loaded for inelastic scattering.")
-                    raise RuntimeError("Szaloki parameters not loaded for inelastic scattering.")
                 # Add inelastic contribution
                 inel = self.calc_inelastic(atom)
                 Iat += inel
@@ -206,6 +203,11 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
     def calc_inelastic(self, element: str) -> np.ndarray:
         """Calculate inelastic scattering for given atomic number."""
+
+        # Ensure Szaloki parameters are loaded
+        if self.Szaloki_params is None:
+            logger.error("ERROR: Szaloki parameters not loaded for inelastic scattering.")
+            raise RuntimeError("Szaloki parameters not loaded for inelastic scattering.")
 
         def get_atomic_number(element: str) -> int:
             """Get atomic number for element."""
@@ -252,7 +254,15 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
         atomic_number = get_atomic_number(element)
 
-        atom_index = np.where(self.Szaloki_params[:, 0] == atomic_number)[0][0]
+        # Check if atomic number exists in Szaloki parameters
+        matching_indices = np.where(self.Szaloki_params[:, 0] == atomic_number)[0]
+        if len(matching_indices) == 0:
+            logger.error(f"ERROR: Inelastic scattering parameters not available for element '{element}' (Z={atomic_number}). "
+                        f"Szaloki parameters are only available for elements H through Md (Z=1-100).")
+            raise ValueError(f"Inelastic scattering parameters not available for element '{element}' (Z={atomic_number}). "
+                           f"Szaloki parameters are only available for elements H through Md (Z=1-100).")
+        
+        atom_index = matching_indices[0]
         params = self.Szaloki_params[atom_index]
         Z, d1, d2, d3, q1, t1, t2, t3, *_ = params
 
