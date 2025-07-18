@@ -3,13 +3,12 @@
 Main script for X-ray and Electron Diffraction (XED) calculations.
 Handles command line interface and orchestrates calculations.
 """
-import numpy as np
 import os
 from argparse import Namespace
 
 from .io_utils import parse_cmd_args, output_logger, get_elements_from_input, export_static_data, export_tr_data, find_xyz_files
 from .physics import XRDDiffractionCalculator, UEDDiffractionCalculator
-from .plotting import plot_static, plot_time_resolved, plot_time_resolved_pdf
+from .plotting import plot_static, plot_time_resolved
 
 
 def main():
@@ -205,6 +204,7 @@ def iamxed(args: Namespace):
                     elif args.xrd:
                         export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
                             signal_raw=signal_raw, signal_smooth=signal_smooth)
+        logger.info("Calculation complete!")
     except Exception as e:
         logger.error(f"ERROR: Calculation issued exception: {str(e)}")
         return 1
@@ -220,25 +220,20 @@ def iamxed(args: Namespace):
                         pdf=diff_pdf, plot_flip=args.plot_flip)
             else:
                 if args.calculation_type == 'static':
-                    logger.info('Plotting static signal...')
+                    logger.info('Plotting static signal.')
                     plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf, plot_flip=args.plot_flip)
                 elif args.calculation_type == 'time-resolved':
-                    logger.info('Plotting time-resolved signal...')
-                    plot_time_resolved(times, q, signal_raw, args.xrd, plot_units=args.plot_units, smoothed=False,
-                        fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
-                    plot_time_resolved(times_smooth, q, signal_smooth, args.xrd, plot_units=args.plot_units,
-                        smoothed=True, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
-                    if not args.xrd:  # Plot PDFs for UED only
-                        logger.info('Plotting time-resolved PDFs...')
-                        plot_time_resolved_pdf(times, r, pdfs_raw, smoothed=False, fwhm_fs=args.fwhm,
-                            plot_flip=args.plot_flip)
-                        plot_time_resolved_pdf(times_smooth, r, pdfs_smooth, smoothed=True, fwhm_fs=args.fwhm,
-                            plot_flip=args.plot_flip)
+                    logger.info('Plotting time-resolved signal.')
+                    plot_time_resolved(times, times_smooth, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth,
+                        args.xrd, plot_units=args.plot_units, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
         except Exception as e:
             logger.error(f"ERROR: Plotting issued exception: {str(e)}")
             return 1
 
-    logger.info('\nIAM-XED calculation complete!')
+    logger.info('\n'
+                '-----------------------\n'
+                '|  IAM-XED finished!  |\n'
+                '-----------------------\n')
     return 0
 
 if __name__ == '__main__':
