@@ -117,7 +117,7 @@ Both modes are compatible with UED and XRD (possibly with inelastic Compton scat
 
 ### Static Calculations
 
-Static calculations compute the average signal over all provided geometries. This is useful for obtaining a single diffraction pattern or PDF from a static structure or an ensemble of structures.
+Static calculations compute the average signal over all provided geometries. This is useful for obtaining a single diffraction pattern or rPDF from a static structure or an ensemble of structures.
 If reference geometries are provided, the difference signal is calculated as a relative change from the reference signal.
 
 ### Time-resolved Calculations
@@ -218,7 +218,7 @@ Calculates the same signal as in trajectory case, averaging over all trajectorie
 ```bash
 iamxed --ued --signal-geoms molecule.xyz
 ```
-Calculates the modified scattering intensity $sM(s) = s \cdot I_\mathrm{mol}/I_\mathrm{at}$ and **real-space pair distribution function (PDF)** $P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$. 
+Calculates the real-space pair distribution function (rPDF) $P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$. 
 
 
 **Difference Signal from Single Trajectory:**
@@ -243,14 +243,14 @@ Calculates the same signal as in trajectory case, averaging over all trajectorie
 
 ### Static Calculations
 - `export.txt`: Signal data with units in header
-- `export_PDF.txt`: PDF data (UED only)
+- `export_rPDF.txt`:rPDF data (UED only)
 
 ### Time-Resolved Calculations  
 - `export.npz`: Binary archive containing:
   - `times`, `times_smooth`: Time axis (fs), smooth refers to convoluted data
   - `q`/`s`: Momentum transfer axis (Bohr⁻¹) 
   - `signal_raw`, `signal_smooth`: Diffraction signals, smooth refers to convoluted data
-  - `r`, `pdfs_raw`, `pdfs_smooth`: PDF data (UED only), smooth refers to convoluted data
+  - `r`, `pdfs_raw`, `pdfs_smooth`: rPDF data (UED only), smooth refers to convoluted data
   - `metadata`: Command and units information
 
 The binary archive can be loaded in Python using NumPy:

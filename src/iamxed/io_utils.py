@@ -190,11 +190,11 @@ def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, sign
     logger.info(f"Exporting static data to '{filename}.txt'.")
     if r is not None and pdfs is not None:
         if diff:
-            pdf_header = '\tr (Å)\t\t\tΔPDF (arb. units)'
+            pdf_header = '\tr (Å)\t\t\tΔfPDF (arb. units)'
         else:
-            pdf_header = '\tr (Å)\t\t\tPDF (arb. units)'
-        np.savetxt(filename + '_PDF.txt', np.column_stack((r, pdfs)), header=comment+pdf_header)
-        logger.info(f"Exporting PDF data to '{filename}_PDF.txt'.")
+            pdf_header = '\tr (Å)\t\t\tfPDF (arb. units)'
+        np.savetxt(filename + '_rPDF.txt', np.column_stack((r, pdfs)), header=comment+pdf_header)
+        logger.info(f"Exporting PDF data to '{filename}_rPDF.txt'.")
 
 
 def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
@@ -204,7 +204,7 @@ def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.nd
     cmd_options = ' '.join(flags_list)
     metadata = [f"#Command: iamxed {cmd_options}"]
     if args.ued:
-        metadata += ["#Units: times: fs, s: Bohr⁻¹, signals: dI/I (%), r: Å, pdfs: ΔPDF(r) (arb. units)"]
+        metadata += ["#Units: times: fs, s: Bohr⁻¹, signals: dI/I (%), r: Å, pdfs: ΔrPDF(r) (arb. units)"]
     else:
         metadata += ["#Units: times: fs, q: Bohr⁻¹, signals: dI/I (%)"]
     metadata = np.array(metadata, dtype='U')
