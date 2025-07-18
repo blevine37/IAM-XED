@@ -83,7 +83,8 @@ For practical calculations, the integral is limited to a finite range $[s_{min},
 $$
 P(r) = r \int_{s_{min}}^{s_{max}} s M(s) \sin(s r) \mathrm{e}^{-\alpha s^2} \mathrm{d}s .
 $$
-The function above is implemented in IAM-XED. 
+The function above is implemented in IAM-XED. The definition comes from:
+> Centurion, M., Wolf, T. J., & Yang, J. (2022). Ultrafast imaging of molecules with electron diffraction. Annual Review of Physical Chemistry, 73, 21-42.
 
 **Warning**: Some sources define PDF as
 $$
