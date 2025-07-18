@@ -49,6 +49,48 @@ working correctly by launching pytest in the root directory (IAM-XED) of the rep
 pytest -v
 ```
 
+## Physics
+
+### Independent Atom Model (IAM)
+The independent atom model (IAM) is a widely used approximation in X-ray and electron diffraction calculations. It assumes that the scattering from a molecule can be approximated as the sum of the scattering from individual atoms, neglecting interatomic interactions.
+Total intensity of the scattering signal within IAM is given by
+$$
+I(s) = \sum_{i=1}^{N} f_i(s) + \sum_{j=1}^{N}\sum_{j\neq i}^{N} f_i^*(s) f_j (s) \frac{\sin ( s r_{ij})}{s r_{ij}} = I_\mathrm{at}(s) + I_\mathrm{mol}(s)
+$$
+where $f_i(s)$ is the atomic form factor (AFF) of the $i$-th atom, $r_{ij}$ is the distance between atoms $i$ and $j$, and $s$ is the momentum transfer (or scattering vector). The first term represents the atomic contribution to scattering intensity independent of molecular position, while the second term accounts for the molecular contribution (interference between different atoms in the molecule).
+Two notes on the difference between UED and XRD:
+1. In XRD, the momentum transfer is usually labeled $q$ instead of $s$ in UED but the definition is the same.
+2. In UED, AFFs are complex functions, while in XRD they are real-valued. 
+
+### Inelastic Compton Scattering
+In XRD, inelastic Compton scattering can be included in the IAM calculations. The modified scattering intensity is given by
+$$
+I = I_\mathrm{at} + I_\mathrm{mol} + I_\mathrm{inel}
+$$
+where $I_\mathrm{inel}(s)$ is the inelastic contribution to the scattering intensity. 
+Within IAM, the inelastic contribution is independent of molecular geometry.
+
+### Pair Distribution Function (PDF)
+IAM-XED defines the real-space pair distribution function (PDF) for UED as
+$$
+P(r) = r \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s
+$$
+where $sM(s)$ represents the modified scattering intensity
+$$
+sM(s) = s\frac{I_\mathrm{mol}(s)}{I_\mathrm{at}(s)}.
+$$
+For practical calculations, the integral is limited to a finite range $[s_{min}, s_{max}]$ and damped by a Gaussian smearing factor $\mathrm{e}^{-\alpha s^2}$, leading to the final expression
+$$
+P(r) = r \int_{s_{min}}^{s_{max}} s M(s) \sin(s r) \mathrm{e}^{-\alpha s^2} \mathrm{d}s .
+$$
+The function above is implemented in IAM-XED. 
+
+**Warning**: Some sources define PDF as
+$$
+\tilde{P}(r) = \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s
+$$
+which in NOT used in IAM-XED but can be achieved by dividing our PDF by $r$. To distinguish the two definitions, we use term 'rPDF' in IAM-XED to emphasize the multiplication by $r$ in our definition of PDF.
+
 ## Quick start
 IAM-XED is called in the command line with input specified in form of flags.
 Three main specification govern the type of calculation:

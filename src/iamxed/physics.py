@@ -107,7 +107,7 @@ class BaseDiffractionCalculator(ABC):
 
     @staticmethod
     def FT(r: np.ndarray, s: np.ndarray, T: np.ndarray, alpha: float) -> np.ndarray:
-        """Fourier transform for PDF calculation.
+        """Fourier transform for rPDF calculation.
         
         Args:
             s: Q-grid in Angstrom^-1
@@ -115,9 +115,9 @@ class BaseDiffractionCalculator(ABC):
             alpha: Damping parameter in Angstrom^2
             
         Returns:
-            PDF on same grid as input
+            rPDF on same grid as input
         """
-        logger.debug("[DEBUG]: Entering Fourier transform for PDF calculation")
+        logger.debug("[DEBUG]: Entering Fourier transform for rPDF calculation")
         T = np.nan_to_num(T)
         Tr = np.empty_like(T)
         for pos, k in enumerate(r):
@@ -139,7 +139,7 @@ class BaseDiffractionCalculator(ABC):
         # Tr2 = np.interp(r, r2, Tr2)  # Interpolate back to original r grid
         # Tr2 *= r  # Scale by r
 
-        logger.debug("[DEBUG]: Finished Fourier transform for PDF calculation")
+        logger.debug("[DEBUG]: Finished Fourier transform for rPDF calculation")
 
         return Tr
 
@@ -739,7 +739,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
         # Now calculate PDF from the final signal
         # Final signal: mean_s(t) - mean_s(0)
-        logger.info('* Calculating PDF from averaged signal.')
+        logger.info('* Calculating rPDF from averaged signal.')
         sm_ang = np.real(mean_sM - mean_sM0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
         pdfs_raw = np.empty((len(q_ang), sm_ang.shape[1]))
         for t in range(sm_ang.shape[1]):
