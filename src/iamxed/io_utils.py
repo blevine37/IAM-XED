@@ -190,16 +190,16 @@ def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, sign
     logger.info(f"Exporting static data to '{filename}.txt'.")
     if r is not None and pdfs is not None:
         if diff:
-            pdf_header = '\tr (Å)\t\t\tΔfPDF (arb. units)'
+            pdf_header = '\tr (Å)\t\t\tΔrPDF (arb. units)'
         else:
-            pdf_header = '\tr (Å)\t\t\tfPDF (arb. units)'
+            pdf_header = '\tr (Å)\t\t\trPDF (arb. units)'
         np.savetxt(filename + '_rPDF.txt', np.column_stack((r, pdfs)), header=comment+pdf_header)
         logger.info(f"Exporting PDF data to '{filename}_rPDF.txt'.")
 
 
 def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
-                   signal_raw: np.ndarray, signal_smooth: np.ndarray, r: Optional[np.ndarray] = None, pdfs_raw: Optional[np.ndarray] = None,
-                   pdfs_smooth: Optional[np.ndarray] = None):
+                   signal_raw: np.ndarray, signal_smooth: np.ndarray, r: Optional[np.ndarray] = None, pdf_raw: Optional[np.ndarray] = None,
+                   pdf_smooth: Optional[np.ndarray] = None):
     """Export time-resoloved data to a file in a npz format suitable for further analysis. UED exports PDFs as well."""
     cmd_options = ' '.join(flags_list)
     metadata = [f"#Command: iamxed {cmd_options}"]
@@ -210,8 +210,8 @@ def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.nd
     metadata = np.array(metadata, dtype='U')
     if args.ued:  # Include PDFs for UED only
         np.savez(args.export, times=times, times_smooth=times_smooth, s=q, signal_raw=signal_raw,
-            signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth, metadata=metadata)
-        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdfs_raw, pdfs_smooth)), comments=header, header='# q    PDF    convoluted PDF')
+            signal_smooth=signal_smooth, r=r, pdf_raw=pdf_raw, pdf_smooth=pdf_smooth, metadata=metadata)
+        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdf_raw, pdf_smooth)), comments=header, header='# q    PDF    convoluted PDF')
         # logger.info(f"Exporting time-resolved PDF to '{args.export}.npz'.")
         # todo: export readable files in txt
     else:
