@@ -10,15 +10,15 @@ from logging import getLogger
 logger = getLogger("my_logger") # getting logger
 
 def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: bool = False, plot_units: str = 'bohr-1', r: Optional[np.ndarray] = None, pdf: Optional[np.ndarray] = None, plot_flip: bool = False) -> None:
-    """Plot static diffraction pattern, and PDF if provided.
+    """Plot static diffraction pattern, and rPDF if provided.
     Args:
         q: Q-values in atomic units
         signal: Diffraction signal (in Bohr^-1 for UED)
         is_xrd: True if XRD, False if UED
         is_difference: True if plotting difference signal
         plot_units: 'bohr-1' or 'angstrom-1'
-        r: r grid for PDF (optional)
-        pdf: PDF values (optional)
+        r: r grid for rPDF (optional)
+        pdf: rPDF values (optional)
         plot_flip: Whether to flip x and y axes
     """
 
@@ -27,7 +27,7 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
     # get qmin and qmax
     qmin, qmax = np.min(q), np.max(q)
 
-    # get rmin and rmax if PDF is present
+    # get rmin and rmax if rPDF is present
     if pdf_present:
         rmin, rmax = np.min(r), np.max(r)
 
@@ -51,11 +51,11 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
     # pdf
     if pdf_present:
         if is_difference:
-            title_pdf = 'Difference Pair Distribution Function ($\Delta$PDF)'
-            label_pdf = '$\Delta$PDF (arb. units)'
+            title_pdf = 'Difference Pair Distribution Function ($\Delta$rPDF)'
+            label_pdf = '$\Delta$rPDF (arb. units)'
         else:
-            title_pdf = 'Pair Distribution Function (PDF)'
-            label_pdf = 'PDF (arb. units)'
+            title_pdf = 'Pair Distribution Function (rPDF)'
+            label_pdf = 'rPDF (arb. units)'
 
     #  intensity
     if is_xrd:
@@ -73,7 +73,7 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
             label_i = '$I(s)$ (arb. units)'
             title_i = 'UED Signal Intensity'
 
-    # initialize plot depending on PDF presence
+    # initialize plot depending on rPDF presence
     if pdf_present:
         fig, axs = plt.subplots(1,2, figsize=(5*2, 5), gridspec_kw={'width_ratios': [1, 1]})
         ax_I = axs[0]
@@ -102,7 +102,7 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
     ax_I.set_title(title_i)
     ax_I.grid(True, alpha=0.3)
 
-    # Plot PDF if provided
+    # Plot rPDF if provided
     if pdf_present:
         # Then handle plot orientation
         if plot_flip:
@@ -144,9 +144,9 @@ def plot_time_resolved(times: np.ndarray, times_smooth: np.ndarray, q: np.ndarra
         q: Q-values in atomic units
         signal: Diffraction signal (in Bohr^-1 for UED)
         signal_smooth: Convoluted diffraction signal (in Bohr^-1 for UED)
-        r: R-grid for PDF (optional)
-        pdf: PDF values (optional)
-        pdf_smooth: Convoluted PDF values (optional)
+        r: R-grid for rPDF (optional)
+        pdf: rPDF values (optional)
+        pdf_smooth: Convoluted rPDF values (optional)
         is_xrd: True if XRD, False if UED
         plot_units: 'bohr-1' or 'angstrom-1'
         smoothed: Whether this is smoothed data
@@ -227,13 +227,13 @@ def plot_time_resolved(times: np.ndarray, times_smooth: np.ndarray, q: np.ndarra
     plt.colorbar(im, label=f'$\Delta I/I_0$ (%)')
     ax_i_smooth.set_title(title_i)
 
-    ### plot PDF if provided ###
+    ### plot rPDF if provided ###
     if pdf_present:
-        ### raw PDF ###
+        ### raw rPDF ###
         signal_plot = pdf
         vlim = np.nanmax(np.abs(signal_plot))
         divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
-        title_pdf = f'Time-Resolved {"XRD" if is_xrd else "UED"} PDF'
+        title_pdf = f'Time-Resolved {"XRD" if is_xrd else "UED"} $\Delta$rPDF'
 
         if plot_flip:
             # Transpose data, swap axes: x=time, y=q
@@ -246,14 +246,14 @@ def plot_time_resolved(times: np.ndarray, times_smooth: np.ndarray, q: np.ndarra
             im = ax_pdf.imshow(signal_plot.T, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
             ax_pdf.set_xlabel('$r$ (Å)')
             ax_pdf.set_ylabel('Time (fs)')
-        plt.colorbar(im, label=f'PDF (arb. units)')  # if is_xrd else f'ΔsM(q) {sm_unit}')
+        plt.colorbar(im, label=f'$\Delta$rPDF (arb. units)')  # if is_xrd else f'ΔsM(q) {sm_unit}')
         ax_pdf.set_title(title_pdf)
 
-        ### convoluted PDF ###
+        ### convoluted rPDF ###
         signal_plot = pdf_smooth
         vlim = np.nanmax(np.abs(signal_plot))
         divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
-        title_pdf = f'Convoluted TR-{"XRD" if is_xrd else "UED"} PDF'
+        title_pdf = f'Convoluted TR-{"XRD" if is_xrd else "UED"} $\Delta$rPDF'
 
         if plot_flip:
             # Transpose data, swap axes: x=time, y=q
@@ -268,7 +268,7 @@ def plot_time_resolved(times: np.ndarray, times_smooth: np.ndarray, q: np.ndarra
             ax_pdf_smooth.set_xlabel('$r$ (Å)')
             ax_pdf_smooth.set_ylabel('Time (fs)')
             ax_pdf_smooth.axhline(0, color='grey', linestyle='-', lw=0.5)
-        plt.colorbar(im, label='PDF (arb. units)')  # if is_xrd else f'ΔsM(q) {sm_unit}')
+        plt.colorbar(im, label='$\Delta$rPDF (arb. units)')  # if is_xrd else f'ΔsM(q) {sm_unit}')
         ax_pdf_smooth.set_title(title_pdf)
 
     plt.tight_layout()

@@ -179,7 +179,7 @@ def iamxed(args: Namespace):
             elif args.calculation_type == 'time-resolved':
                 if signal_geom_type == 'directory':
                     logger.info('Starting time-resolved calculation for an ensemble of trajectories.')
-                    times, q, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_ensemble(
+                    times, q, signal_raw, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth = calculator.calc_ensemble(
                         args.signal_geoms,
                         timestep_au=args.timestep,
                         fwhm_fs=args.fwhm,
@@ -188,7 +188,7 @@ def iamxed(args: Namespace):
                     )
                 else:
                     logger.info('Starting time-resolved calculation for a single trajectory.')
-                    times, q, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth = calculator.calc_trajectory(
+                    times, q, signal_raw, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth = calculator.calc_trajectory(
                         args.signal_geoms,
                         timestep_au=args.timestep,
                         fwhm_fs=args.fwhm,
@@ -199,8 +199,8 @@ def iamxed(args: Namespace):
                 if args.export:
                     if args.ued:  # Include PDFs for UED only
                         export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
-                            signal_raw=signal_raw, signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw,
-                            pdfs_smooth=pdfs_smooth)
+                            signal_raw=signal_raw, signal_smooth=signal_smooth, r=r, pdf_raw=pdf_raw,
+                            pdf_smooth=pdf_smooth)
                     elif args.xrd:
                         export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
                             signal_raw=signal_raw, signal_smooth=signal_smooth)
@@ -224,7 +224,7 @@ def iamxed(args: Namespace):
                     plot_static(q, signal, args.xrd, plot_units=args.plot_units, r=r, pdf=pdf, plot_flip=args.plot_flip)
                 elif args.calculation_type == 'time-resolved':
                     logger.info('Plotting time-resolved signal.')
-                    plot_time_resolved(times, times_smooth, q, signal_raw, signal_smooth, r, pdfs_raw, pdfs_smooth,
+                    plot_time_resolved(times, times_smooth, q, signal_raw, signal_smooth, r, pdf_raw, pdf_smooth,
                         args.xrd, plot_units=args.plot_units, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
         except Exception as e:
             logger.error(f"ERROR: Plotting issued exception: {str(e)}")

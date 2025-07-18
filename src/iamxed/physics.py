@@ -107,7 +107,7 @@ class BaseDiffractionCalculator(ABC):
 
     @staticmethod
     def FT(r: np.ndarray, s: np.ndarray, T: np.ndarray, alpha: float) -> np.ndarray:
-        """Fourier transform for PDF calculation.
+        """Fourier transform for rPDF calculation.
         
         Args:
             s: Q-grid in Angstrom^-1
@@ -115,9 +115,9 @@ class BaseDiffractionCalculator(ABC):
             alpha: Damping parameter in Angstrom^2
             
         Returns:
-            PDF on same grid as input
+            rPDF on same grid as input
         """
-        logger.debug("[DEBUG]: Entering Fourier transform for PDF calculation")
+        logger.debug("[DEBUG]: Entering Fourier transform for rPDF calculation")
         T = np.nan_to_num(T)
         Tr = np.empty_like(T)
         for pos, k in enumerate(r):
@@ -139,7 +139,7 @@ class BaseDiffractionCalculator(ABC):
         # Tr2 = np.interp(r, r2, Tr2)  # Interpolate back to original r grid
         # Tr2 *= r  # Scale by r
 
-        logger.debug("[DEBUG]: Finished Fourier transform for PDF calculation")
+        logger.debug("[DEBUG]: Finished Fourier transform for rPDF calculation")
 
         return Tr
 
@@ -336,8 +336,8 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             signal_raw: Raw signal (not smoothed)
             signal_smooth: Gaussian smoothed signal
             r: R-grid for PDF (dummy for XRD)
-            pdfs_raw: Raw PDFs (dummy for XRD)
-            pdfs_smooth: Gaussian smoothed PDFs (dummy for XRD)
+            pdf_raw: Raw PDFs (dummy for XRD)
+            pdf_smooth: Gaussian smoothed PDFs (dummy for XRD)
         """
         logger.info("* Fetching trajectory data.")
         atoms, trajectory = read_xyz_trajectory(trajfile)
@@ -588,8 +588,8 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             signal_raw: Raw signal (not smoothed)
             signal_smooth: Gaussian smoothed signal
             r: R-grid for PDF in Angstroms
-            pdfs_raw: Raw PDFs (not smoothed)
-            pdfs_smooth: Gaussian smoothed PDFs
+            pdf_raw: Raw PDFs (not smoothed)
+            pdf_smooth: Gaussian smoothed PDFs
         """
         logger.info("* Fetching trajectory data.")
         atoms, trajectory = read_xyz_trajectory(trajfile)
@@ -636,7 +636,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             pdfs.append(pdf)
 
         signal_raw = np.array(signals).T
-        pdfs_raw = np.array(pdfs).T      # Shape: [r_points, time_points]
+        pdf_raw = np.array(pdfs).T      # Shape: [r_points, time_points]
 
         # Calculate time axis for the frames we actually processed
         times = np.arange(len(signals)) * dt_fs
@@ -644,9 +644,9 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         # Smooth signals and PDFs separately
         logger.info("* Convoluting the signal with Gaussian kernel.")
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
-        pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
+        pdf_smooth, _ = self.gaussian_smooth_2d_time(pdf_raw, times, fwhm_fs)
 
-        return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth
+        return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth
 
     def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate ensemble-averaged signal and PDF from a directory of trajectories, matching the interface of calc_trajectory.
@@ -739,15 +739,15 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
         # Now calculate PDF from the final signal
         # Final signal: mean_s(t) - mean_s(0)
-        logger.info('* Calculating PDF from averaged signal.')
+        logger.info('* Calculating rPDF from averaged signal.')
         sm_ang = np.real(mean_sM - mean_sM0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
-        pdfs_raw = np.empty((len(q_ang), sm_ang.shape[1]))
+        pdf_raw = np.empty((len(q_ang), sm_ang.shape[1]))
         for t in range(sm_ang.shape[1]):
-            pdfs_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha)
+            pdf_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha)
 
         logger.info('* Convoluting singal in time with Gaussian kernel.')
         times = np.arange(max_frames) * dt_fs
         signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
-        pdfs_smooth, _ = self.gaussian_smooth_2d_time(pdfs_raw, times, fwhm_fs)
+        pdf_smooth, _ = self.gaussian_smooth_2d_time(pdf_raw, times, fwhm_fs)
 
-        return times, self.qfit, dIoverI, times_smooth, signal_smooth, r, pdfs_raw, pdfs_smooth
+        return times, self.qfit, dIoverI, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth
