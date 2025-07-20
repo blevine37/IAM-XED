@@ -115,7 +115,7 @@ def iamxed(args: Namespace):
 
     ### code ###
     # Set up logger
-    logger = output_logger(args.log_to_file, args.debug)
+    logger = output_logger(args.log_to_file_disable, args.debug)
 
     # check that args are Namespace in case iamxed is called from python script
     if not isinstance(args, Namespace):

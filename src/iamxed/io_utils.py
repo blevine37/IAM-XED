@@ -8,7 +8,7 @@ import argparse
 import os
 from typing import List, Tuple, Optional
 
-def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logger:
+def output_logger(disable_file_output: bool = True, debug: bool = False) -> logging.Logger:
     """Set up the logger for output messages."""
     global logger
 
@@ -26,7 +26,7 @@ def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logg
     logger.addHandler(console_handler)
 
     # Output file handler
-    if file_output:
+    if not disable_file_output:
         file_handler = logging.FileHandler('iamxed.out', mode='w')
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
@@ -319,8 +319,8 @@ def parse_cmd_args() -> argparse.Namespace:
     
     # Output options
     out_sec = parser.add_argument_group("Output options")
-    out_sec.add_argument('--log-to-file', action='store_false',
-                        help="Save output to 'iamxed.out'. Default: True.")
+    out_sec.add_argument('--log-to-file-disable', action='store_true',
+                        help="Disable logging output to 'iamxed.out' along with console. Default: False.")
     out_sec.add_argument('--debug', action='store_true',
                         help="Print debug output. Default: False.")
     out_sec.add_argument('--plot-disable', action='store_true',
@@ -329,7 +329,9 @@ def parse_cmd_args() -> argparse.Namespace:
                         help='Flip x and y axes in all plot. Default: False.')
     out_sec.add_argument('--export', type=str,
                         help='Provide a file name to which calculated data will be exported. File will be named as'
-                             ' <filename>.txt. Default: None.')
+                             ' <file_name>.txt for static calculations and <file_name>.npz for time-resolved calculations. '
+                             "Binary npz files are storage efficient and can be read with Numpy in Python using "
+                             "'np.load(<file_name>.npz'. Default: None.")
     out_sec.add_argument('--plot-units', type=str, default='bohr-1', choices=['bohr-1', 'angstrom-1'],
                         help="Units for plotting the q axis, does not affect export: 'bohr-1' (default) or 'angstrom-1'.")
     

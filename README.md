@@ -152,26 +152,26 @@ Reference geometries are used for calculating the difference signal in static ca
 
 ## Key Options
 
-| Option | Description                                                                  | Default                                 |
-|--------|------------------------------------------------------------------------------|-----------------------------------------|
-| `--calculation-type` | `static` or `time-resolved`                                                  | `static`                                |
-| `--signal-geoms` | Path to single XYZ file or directory of XYZ files                            | None (required parameter)               |
-| `--reference-geoms` | Path to reference XYZ file for difference signal (available only for static) | None                                    |
-| `--ued` | Enable ultrafast electron diffraction calculation                            | False (mutually exclusive with `--xrd`) |
-| `--xrd` | Enable X-ray diffraction calculation                                         | False (mutually exclusive with `--ued`) |
-| `--inelastic` | Include inelastic scattering (XRD only)                                      | False                                   |
-| `--timestep` | Time step (atomic time units)                                                | 10.0                                    |
-| `--tmax` | Maximum time considered (fs)                                                 | None (up to the longest trajectory)     |
-| `--fwhm` | FWHM parameter for Gaussian temporal convolution (fs)                        | 150.0                                   |
-| `--pdf-alpha` | PDF damping parameter (Å²)                                                | 0.04                                    |
-| `--qmin`, `--qmax` | Momentum transfer range $q$ (or $s$) (Bohr⁻¹)                           | $5.29\cdot 10^{-9}$, $5.29$             |
-| `--npoints` | Number of $q$-points                                                         | 200                                     |
-| `--log-to-file` | Log output to file along with console                                        | False                                   |
-| `--plot-disable` | Disable plotting of results                                                  | False                                   |
-| `--export` | Export data by providing a filename                                          | None                                    |
-| `--plot-units` | `bohr-1` or `angstrom-1`                                                     | `bohr-1`                                |
-| `--plot-flip` | Flip x and y axis in plots                                                   | False                                   |
-| `--debug` | Enable debug output                                                          | False                                   |
+| Option                  | Description                                                                     | Default                                 |
+|-------------------------|---------------------------------------------------------------------------------|-----------------------------------------|
+| `--calculation-type`    | `static` or `time-resolved`                                                     | `static`                                |
+| `--signal-geoms`        | Path to single XYZ file or directory of XYZ files.                              | None (required parameter)               |
+| `--reference-geoms`     | Path to reference XYZ file for difference signal (available only for `static`). | None                                    |
+| `--ued`                 | Enable ultrafast electron diffraction calculation.                              | False (mutually exclusive with `--xrd`) |
+| `--xrd`                 | Enable X-ray diffraction calculation.                                           | False (mutually exclusive with `--ued`) |
+| `--inelastic`           | Include inelastic scattering (XRD only).                                        | False                                   |
+| `--timestep`            | Time step (atomic time units).                                                  | 10.0                                    |
+| `--tmax`                | Maximum time considered (fs).                                                   | None (up to the longest trajectory)     |
+| `--fwhm`                | FWHM parameter for Gaussian temporal convolution (fs).                          | 150.0                                   |
+| `--pdf-alpha`           | PDF damping parameter (Å²).                                                     | 0.04                                    |
+| `--qmin`, `--qmax`      | Momentum transfer range $q$ (or $s$) (Bohr⁻¹).                                  | $5.29\cdot 10^{-9}$, $5.29$             |
+| `--npoints`             | Number of $q$-points.                                                           | 200                                     |
+| `--log-to-file-disable` | Disable logging output to a file along with console.                            | False                                   |
+| `--plot-disable`        | Disable plotting of results.                                                    | False                                   |
+| `--export`              | Export data by providing a filename.                                            | None                                    |
+| `--plot-units`          | `bohr-1` or `angstrom-1`                                                        | `bohr-1`                                |
+| `--plot-flip`           | Flip x and y axis in plots.                                                     | False                                   |
+| `--debug`               | Enable debug output.                                                            | False                                   |
 
 More details on each option can be found in the help message (`iamxed --help`).
 
@@ -299,7 +299,7 @@ params = {
     "pdf_alpha": 0.04,
     "tmax": False,
     "export": "ued_ensemble",
-    "log_to_file": False,
+    "log_to_file_disable": False,
     "plot_disable": True,
     "plot_flip": False,
     "plot_units": "bohr-1",
