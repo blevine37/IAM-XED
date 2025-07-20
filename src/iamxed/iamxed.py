@@ -41,6 +41,8 @@ def iamxed(args: Namespace):
             # skip parameters that do not impact the calculation to show only relevant parameters
             if args.calculation_type == 'static' and key in ['fwhm', 'tmax', 'timestep']:
                 continue
+            elif args.calculation_type == 'time-resolved' and key in ['reference_geoms']:
+                continue
             if args.ued and key in ['xrd', 'inelastic']:
                 continue
             elif args.xrd and key in ['ued', 'pdf_alpha']:
