@@ -1,6 +1,6 @@
 [project]
 name = "iamxed"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
   { name="Jiri Suchan", email="suchanjiri@yahoo.com" },
   { name="Jiri Janos", email="jiri.janos98@gmail.com" }
