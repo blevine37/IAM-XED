@@ -40,8 +40,8 @@ jobs:
 
     - name: Test iamxed with `uv run` using ued and xrd flags
       run: |
-        uv run iamxed --ued --calculation-type static --signal-geoms test/H2/h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out
-        uv run iamxed --xrd --calculation-type static --signal-geoms test/H2/h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out
+        uv run iamxed --ued --signal-type static --signal-geoms test/H2/h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out
+        uv run iamxed --xrd --signal-type static --signal-geoms test/H2/h2.xyz --qmin 0.0 --qmax 10.0 --npoints 1000 --export ued.out
 
     - name: Install IAM-XED package
       run: uv pip install --system -e .[test]

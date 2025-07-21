@@ -282,7 +282,7 @@ def parse_cmd_args() -> argparse.Namespace:
     
     # General options
     general_sec = parser.add_argument_group("General options")
-    general_sec.add_argument('--calculation-type', type=str, choices=['static', 'time-resolved'], default='static',
+    general_sec.add_argument('--signal-type', type=str, choices=['static', 'time-resolved'], default='static',
         help='Either perform static or time-resolved calculation. Static calculation averages signal from all geometries provided. '
              'Time-resolved calculation will treat xyz files as trajectories and will average the signal only within time frames. '
              'Default: static.')

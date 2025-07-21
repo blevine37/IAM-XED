@@ -96,20 +96,20 @@ which in NOT used in IAM-XED but can be achieved by dividing our PDF by $r$. To 
 IAM-XED is called in the command line with input specified in form of flags.
 Three main specification govern the type of calculation:
 - XRD or UED calculation (`--xrd` or `--ued`)
-- static or time-resolved calculation (`--calculation-type static` or `--calculation-type time-resolved`)
+- static or time-resolved calculation (`--signal-type static` or `--signal-type time-resolved`)
 - input geometries for calculating the signal in XYZ format and Angstrom units (`--signal-geoms <path>`)
 
 Input geometries can be provided as a single XYZ file or a directory containing multiple XYZ files. 
 Simple examples of how to use IAM-XED for different types of calculations are shown below:
 ```bash
 # Single molecule
-iamxed --xrd --calculation-type static --signal-geoms molecule.xyz
+iamxed --xrd --signal-type static --signal-geoms molecule.xyz
 
 # Trajectory 
-iamxed --ued --calculation-type time-resolved --signal-geoms traj.xyz
+iamxed --ued --signal-type time-resolved --signal-geoms traj.xyz
 
 # Averaging over a set of trajectories in a directory
-iamxed --xrd --calculation-type time-resolved --signal-geoms ./dir_with_trajs/
+iamxed --xrd --signal-type time-resolved --signal-geoms ./dir_with_trajs/
 ```
 
 ## Types of calculations available
@@ -154,7 +154,7 @@ Reference geometries are used for calculating the difference signal in static ca
 
 | Option                  | Description                                                                     | Default                                 |
 |-------------------------|---------------------------------------------------------------------------------|-----------------------------------------|
-| `--calculation-type`    | `static` or `time-resolved`                                                     | `static`                                |
+| `--signal-type`         | `static` or `time-resolved`                                                     | `static`                                |
 | `--signal-geoms`        | Path to single XYZ file or directory of XYZ files.                              | None (required parameter)               |
 | `--reference-geoms`     | Path to reference XYZ file for difference signal (available only for `static`). | None                                    |
 | `--ued`                 | Enable ultrafast electron diffraction calculation.                              | False (mutually exclusive with `--xrd`) |
@@ -202,13 +202,13 @@ Includes Compton scattering using Szaloki parameters.
 
 **Time-resolved Single Trajectory Calulation:**
 ```bash
-iamxed --xrd --signal-geoms trajectory.xyz --calculation-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40
+iamxed --xrd --signal-geoms trajectory.xyz --signal-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40
 ```
 Calculates the time-resolved relative difference scattering signal $\Delta I/I_0 (q,t)$ against the t=0 frame. Momentum coordinate divided to 100 points goes from 0.0 to 10.0 Bohr⁻¹. Timestep is assumed 40 a.t.u.
 
 **Time-resolved Ensemble Calulation:**
 ```bash
-iamxed --xrd --signal-geoms ./ensemble_dir/ --calculation-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40 --tmax 500
+iamxed --xrd --signal-geoms ./ensemble_dir/ --signal-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40 --tmax 500
 ```
 Calculates the same signal as in trajectory case, averaging over all trajectories in the `./ensemble_dir/` folder up to 500 fs.
 
@@ -230,13 +230,13 @@ Calculates the relative difference signal: $\Delta I/I_0 = (I_1-I_0)/I_0 \cdot 1
 
 **Time-Resolved Single Trajectory Calculation:**
 ```bash
-iamxed --ued --calculation-type time-resolved --signal-geoms trajectory.xyz --timestep 40 --fwhm 100 --pdf-alpha 0.04
+iamxed --ued --signal-type time-resolved --signal-geoms trajectory.xyz --timestep 40 --fwhm 100 --pdf-alpha 0.04
 ```
 Calculates time-resolved relative difference signal $\Delta I/I_0 (q,t)$ and $\Delta P(q,t)$ against the $t=0$ frame. Timestep is set to 40 a.t.u., additional temporal smoothing with 100 fs FWHM Gaussian function, $\alpha$ smearing parameter at 0.04 Å².
 
 **Time-resolved Ensemble Calulation:**
 ```bash
-iamxed --ued --calculation-type time-resolved --signal-geoms ./ensemble_dir/ --timestep 40 --fwhm 100 --pdf-alpha 0.04
+iamxed --ued --signal-type time-resolved --signal-geoms ./ensemble_dir/ --timestep 40 --fwhm 100 --pdf-alpha 0.04
 ```
 Calculates the same signal as in trajectory case, averaging over all trajectories in the `./ensemble_dir/` folder.
 
@@ -287,7 +287,7 @@ from argparse import Namespace
 params = {
     "signal_geoms": "./ensemble/",
     "reference_geoms": None,
-    "calculation_type": "time-resolved",
+    "signal_type": "time-resolved",
     "ued": True,
     "xrd": False,
     "inelastic": False,
