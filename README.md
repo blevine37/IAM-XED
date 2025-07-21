@@ -164,7 +164,7 @@ Reference geometries are used for calculating the difference signal in static ca
 | `--tmax`                | Maximum time considered (fs).                                                   | None (up to the longest trajectory)     |
 | `--fwhm`                | FWHM parameter for Gaussian temporal convolution (fs).                          | 150.0                                   |
 | `--pdf-alpha`           | PDF damping parameter (Å²).                                                     | 0.04                                    |
-| `--qmin`, `--qmax`      | Momentum transfer range $q$ (or $s$) (Bohr⁻¹).                                  | $5.29\cdot 10^{-9}$, $5.29$             |
+| `--qmin`, `--qmax`      | Momentum transfer range $q$ (or $s$) (Bohr⁻¹).                                  | $0.0$, $5.29$             |
 | `--npoints`             | Number of $q$-points.                                                           | 200                                     |
 | `--log-to-file-disable` | Disable logging output to a file along with console.                            | False                                   |
 | `--plot-disable`        | Disable plotting of results.                                                    | False                                   |

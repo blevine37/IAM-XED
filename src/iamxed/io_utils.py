@@ -337,7 +337,7 @@ def parse_cmd_args() -> argparse.Namespace:
     
     # Grid parameters
     grid_sec = parser.add_argument_group("Grid parameters")
-    grid_sec.add_argument('--qmin', type=nonnegative_float, default=5.292e-9,
+    grid_sec.add_argument('--qmin', type=nonnegative_float, default=0.0,
                          help='Minimum q value (Bohr^-1).')
     grid_sec.add_argument('--qmax', type=positive_float, default=5.292,
                          help='Maximum q value (Bohr^-1).')
