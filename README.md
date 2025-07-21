@@ -49,24 +49,67 @@ working correctly by launching pytest in the root directory (IAM-XED) of the rep
 pytest -v
 ```
 
+## Physics
+
+### Independent Atom Model (IAM)
+The independent atom model (IAM) is a widely used approximation in X-ray and electron diffraction calculations. It assumes that the scattering from a molecule can be approximated as the sum of the scattering from individual atoms, neglecting interatomic interactions.
+Total intensity of the scattering signal within IAM is given by
+
+$$I(s) = \sum_{i=1}^{N} f_i(s) + \sum_{j=1}^{N}\sum_{j\neq i}^{N} f_i^*(s) f_j (s) \frac{\sin ( s r_{ij})}{s r_{ij}} = I_\mathrm{at}(s) + I_\mathrm{mol}(s)$$
+
+where $f_i(s)$ is the atomic form factor (AFF) of the $i$-th atom, $r_{ij}$ is the distance between atoms $i$ and $j$, and $s$ is the momentum transfer (or scattering vector). The first term represents the atomic contribution to scattering intensity independent of molecular position, while the second term accounts for the molecular contribution (interference between different atoms in the molecule).
+Two notes on the difference between UED and XRD:
+1. In XRD, the momentum transfer is usually labeled $q$ instead of $s$ in UED but the definition is the same.
+2. In UED, AFFs are complex functions, while in XRD they are real-valued. 
+
+### Inelastic Compton Scattering
+In XRD, inelastic Compton scattering can be included in the IAM calculations. The modified scattering intensity is given by
+
+$$I = I_\mathrm{at} + I_\mathrm{mol} + I_\mathrm{inel}$$
+
+where $I_\mathrm{inel}(s)$ is the inelastic contribution to the scattering intensity. 
+Within IAM, the inelastic contribution is independent of molecular geometry.
+
+### Pair Distribution Function (PDF)
+IAM-XED defines the real-space pair distribution function (PDF) for UED as
+
+$$P(r) = r \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
+
+where $sM(s)$ represents the modified scattering intensity
+
+$$sM(s) = s\frac{I_\mathrm{mol}(s)}{I_\mathrm{at}(s)}.$$
+
+For practical calculations, the integral is limited to a finite range $[s_{min}, s_{max}]$ and damped by a Gaussian smearing factor $\mathrm{e}^{-\alpha s^2}$, leading to the final expression
+
+$$P(r) = r \int_{s_{min}}^{s_{max}} s M(s) \sin(s r) \mathrm{e}^{-\alpha s^2} \mathrm{d}s .$$
+
+The function above is implemented in IAM-XED. The definition comes from:
+> Centurion, M., Wolf, T. J., & Yang, J. (2022). Ultrafast imaging of molecules with electron diffraction. Annual Review of Physical Chemistry, 73, 21-42.
+
+**Warning**: Some sources define PDF as
+
+$$\tilde{P}(r) = \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
+
+which in NOT used in IAM-XED but can be achieved by dividing our PDF by $r$. To distinguish the two definitions, we use term 'rPDF' in IAM-XED to emphasize the multiplication by $r$ in our definition of PDF.
+
 ## Quick start
 IAM-XED is called in the command line with input specified in form of flags.
 Three main specification govern the type of calculation:
 - XRD or UED calculation (`--xrd` or `--ued`)
-- static or time-resolved calculation (`--calculation-type static` or `--calculation-type time-resolved`)
+- static or time-resolved calculation (`--signal-type static` or `--signal-type time-resolved`)
 - input geometries for calculating the signal in XYZ format and Angstrom units (`--signal-geoms <path>`)
 
 Input geometries can be provided as a single XYZ file or a directory containing multiple XYZ files. 
 Simple examples of how to use IAM-XED for different types of calculations are shown below:
 ```bash
 # Single molecule
-iamxed --xrd --calculation-type static --signal-geoms molecule.xyz
+iamxed --xrd --signal-type static --signal-geoms molecule.xyz
 
 # Trajectory 
-iamxed --ued --calculation-type time-resolved --signal-geoms traj.xyz
+iamxed --ued --signal-type time-resolved --signal-geoms traj.xyz
 
 # Averaging over a set of trajectories in a directory
-iamxed --xrd --calculation-type time-resolved --signal-geoms ./dir_with_trajs/
+iamxed --xrd --signal-type time-resolved --signal-geoms ./dir_with_trajs/
 ```
 
 ## Types of calculations available
@@ -75,7 +118,7 @@ Both modes are compatible with UED and XRD (possibly with inelastic Compton scat
 
 ### Static Calculations
 
-Static calculations compute the average signal over all provided geometries. This is useful for obtaining a single diffraction pattern or PDF from a static structure or an ensemble of structures.
+Static calculations compute the average signal over all provided geometries. This is useful for obtaining a single diffraction pattern or rPDF from a static structure or an ensemble of structures.
 If reference geometries are provided, the difference signal is calculated as a relative change from the reference signal.
 
 ### Time-resolved Calculations
@@ -109,26 +152,26 @@ Reference geometries are used for calculating the difference signal in static ca
 
 ## Key Options
 
-| Option | Description                                                                  | Default                                 |
-|--------|------------------------------------------------------------------------------|-----------------------------------------|
-| `--calculation-type` | `static` or `time-resolved`                                                  | `static`                                |
-| `--signal-geoms` | Path to single XYZ file or directory of XYZ files                            | None (required parameter)               |
-| `--reference-geoms` | Path to reference XYZ file for difference signal (available only for static) | None                                    |
-| `--ued` | Enable ultrafast electron diffraction calculation                            | False (mutually exclusive with `--xrd`) |
-| `--xrd` | Enable X-ray diffraction calculation                                         | False (mutually exclusive with `--ued`) |
-| `--inelastic` | Include inelastic scattering (XRD only)                                      | False                                   |
-| `--timestep` | Time step (atomic time units)                                                | 10.0                                    |
-| `--tmax` | Maximum time considered (fs)                                                 | None (up to the longest trajectory)     |
-| `--fwhm` | FWHM parameter for Gaussian temporal convolution (fs)                        | 150.0                                   |
-| `--pdf-alpha` | PDF damping parameter (Å²)                                                | 0.04                                    |
-| `--qmin`, `--qmax` | Momentum transfer range $q$ (or $s$) (Bohr⁻¹)                           | $5.29\cdot 10^{-9}$, $5.29$             |
-| `--npoints` | Number of $q$-points                                                         | 200                                     |
-| `--log-to-file` | Log output to file along with console                                        | False                                   |
-| `--plot-disable` | Disable plotting of results                                                  | False                                   |
-| `--export` | Export data by providing a filename                                          | None                                    |
-| `--plot-units` | `bohr-1` or `angstrom-1`                                                     | `bohr-1`                                |
-| `--plot-flip` | Flip x and y axis in plots                                                   | False                                   |
-| `--debug` | Enable debug output                                                          | False                                   |
+| Option                  | Description                                                                     | Default                                 |
+|-------------------------|---------------------------------------------------------------------------------|-----------------------------------------|
+| `--signal-type`         | `static` or `time-resolved`                                                     | `static`                                |
+| `--signal-geoms`        | Path to single XYZ file or directory of XYZ files.                              | None (required parameter)               |
+| `--reference-geoms`     | Path to reference XYZ file for difference signal (available only for `static`). | None                                    |
+| `--ued`                 | Enable ultrafast electron diffraction calculation.                              | False (mutually exclusive with `--xrd`) |
+| `--xrd`                 | Enable X-ray diffraction calculation.                                           | False (mutually exclusive with `--ued`) |
+| `--inelastic`           | Include inelastic scattering (XRD only).                                        | False                                   |
+| `--timestep`            | Time step (atomic time units).                                                  | 10.0                                    |
+| `--tmax`                | Maximum time considered (fs).                                                   | None (up to the longest trajectory)     |
+| `--fwhm`                | FWHM parameter for Gaussian temporal convolution (fs).                          | 150.0                                   |
+| `--pdf-alpha`           | PDF damping parameter (Å²).                                                     | 0.04                                    |
+| `--qmin`, `--qmax`      | Momentum transfer range $q$ (or $s$) (Bohr⁻¹).                                  | $0.0$, $5.292$                          |
+| `--npoints`             | Number of $q$-points.                                                           | 200                                     |
+| `--log-to-file-disable` | Disable logging output to a file along with console.                            | False                                   |
+| `--plot-disable`        | Disable plotting of results.                                                    | False                                   |
+| `--export`              | Export data by providing a filename.                                            | None                                    |
+| `--plot-units`          | `bohr-1` or `angstrom-1`                                                        | `bohr-1`                                |
+| `--plot-flip`           | Flip x and y axis in plots.                                                     | False                                   |
+| `--debug`               | Enable debug output.                                                            | False                                   |
 
 More details on each option can be found in the help message (`iamxed --help`).
 
@@ -159,13 +202,13 @@ Includes Compton scattering using Szaloki parameters.
 
 **Time-resolved Single Trajectory Calulation:**
 ```bash
-iamxed --xrd --signal-geoms trajectory.xyz --calculation-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40
+iamxed --xrd --signal-geoms trajectory.xyz --signal-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40
 ```
 Calculates the time-resolved relative difference scattering signal $\Delta I/I_0 (q,t)$ against the t=0 frame. Momentum coordinate divided to 100 points goes from 0.0 to 10.0 Bohr⁻¹. Timestep is assumed 40 a.t.u.
 
 **Time-resolved Ensemble Calulation:**
 ```bash
-iamxed --xrd --signal-geoms ./ensemble_dir/ --calculation-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40 --tmax 500
+iamxed --xrd --signal-geoms ./ensemble_dir/ --signal-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40 --tmax 500
 ```
 Calculates the same signal as in trajectory case, averaging over all trajectories in the `./ensemble_dir/` folder up to 500 fs.
 
@@ -176,7 +219,7 @@ Calculates the same signal as in trajectory case, averaging over all trajectorie
 ```bash
 iamxed --ued --signal-geoms molecule.xyz
 ```
-Calculates the modified scattering intensity $sM(s) = s \cdot I_\mathrm{mol}/I_\mathrm{at}$ and **real-space pair distribution function (PDF)** $P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$. 
+Calculates the real-space pair distribution function (rPDF) $P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$. 
 
 
 **Difference Signal from Single Trajectory:**
@@ -187,13 +230,13 @@ Calculates the relative difference signal: $\Delta I/I_0 = (I_1-I_0)/I_0 \cdot 1
 
 **Time-Resolved Single Trajectory Calculation:**
 ```bash
-iamxed --ued --calculation-type time-resolved --signal-geoms trajectory.xyz --timestep 40 --fwhm 100 --pdf-alpha 0.04
+iamxed --ued --signal-type time-resolved --signal-geoms trajectory.xyz --timestep 40 --fwhm 100 --pdf-alpha 0.04
 ```
 Calculates time-resolved relative difference signal $\Delta I/I_0 (q,t)$ and $\Delta P(q,t)$ against the $t=0$ frame. Timestep is set to 40 a.t.u., additional temporal smoothing with 100 fs FWHM Gaussian function, $\alpha$ smearing parameter at 0.04 Å².
 
 **Time-resolved Ensemble Calulation:**
 ```bash
-iamxed --ued --calculation-type time-resolved --signal-geoms ./ensemble_dir/ --timestep 40 --fwhm 100 --pdf-alpha 0.04
+iamxed --ued --signal-type time-resolved --signal-geoms ./ensemble_dir/ --timestep 40 --fwhm 100 --pdf-alpha 0.04
 ```
 Calculates the same signal as in trajectory case, averaging over all trajectories in the `./ensemble_dir/` folder.
 
@@ -201,14 +244,14 @@ Calculates the same signal as in trajectory case, averaging over all trajectorie
 
 ### Static Calculations
 - `export.txt`: Signal data with units in header
-- `export_PDF.txt`: PDF data (UED only)
+- `export_rPDF.txt`:rPDF data (UED only)
 
 ### Time-Resolved Calculations  
 - `export.npz`: Binary archive containing:
   - `times`, `times_smooth`: Time axis (fs), smooth refers to convoluted data
   - `q`/`s`: Momentum transfer axis (Bohr⁻¹) 
   - `signal_raw`, `signal_smooth`: Diffraction signals, smooth refers to convoluted data
-  - `r`, `pdfs_raw`, `pdfs_smooth`: PDF data (UED only), smooth refers to convoluted data
+  - `r`, `pdf_raw`, `pdf_smooth`: rPDF data (UED only), smooth refers to convoluted data
   - `metadata`: Command and units information
 
 The binary archive can be loaded in Python using NumPy:
@@ -244,7 +287,7 @@ from argparse import Namespace
 params = {
     "signal_geoms": "./ensemble/",
     "reference_geoms": None,
-    "calculation_type": "time-resolved",
+    "signal_type": "time-resolved",
     "ued": True,
     "xrd": False,
     "inelastic": False,
@@ -256,7 +299,7 @@ params = {
     "pdf_alpha": 0.04,
     "tmax": False,
     "export": "ued_ensemble",
-    "log_to_file": False,
+    "log_to_file_disable": False,
     "plot_disable": True,
     "plot_flip": False,
     "plot_units": "bohr-1",

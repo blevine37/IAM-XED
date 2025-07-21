@@ -8,7 +8,7 @@ import argparse
 import os
 from typing import List, Tuple, Optional
 
-def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logger:
+def output_logger(disable_file_output: bool = True, debug: bool = False) -> logging.Logger:
     """Set up the logger for output messages."""
     global logger
 
@@ -26,7 +26,7 @@ def output_logger(file_output: bool = True, debug: bool = False) -> logging.Logg
     logger.addHandler(console_handler)
 
     # Output file handler
-    if file_output:
+    if not disable_file_output:
         file_handler = logging.FileHandler('iamxed.out', mode='w')
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
@@ -190,28 +190,28 @@ def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, sign
     logger.info(f"Exporting static data to '{filename}.txt'.")
     if r is not None and pdfs is not None:
         if diff:
-            pdf_header = '\tr (Å)\t\t\tΔPDF (arb. units)'
+            pdf_header = '\tr (Å)\t\t\tΔrPDF (arb. units)'
         else:
-            pdf_header = '\tr (Å)\t\t\tPDF (arb. units)'
-        np.savetxt(filename + '_PDF.txt', np.column_stack((r, pdfs)), header=comment+pdf_header)
-        logger.info(f"Exporting PDF data to '{filename}_PDF.txt'.")
+            pdf_header = '\tr (Å)\t\t\trPDF (arb. units)'
+        np.savetxt(filename + '_rPDF.txt', np.column_stack((r, pdfs)), header=comment+pdf_header)
+        logger.info(f"Exporting PDF data to '{filename}_rPDF.txt'.")
 
 
 def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
-                   signal_raw: np.ndarray, signal_smooth: np.ndarray, r: Optional[np.ndarray] = None, pdfs_raw: Optional[np.ndarray] = None,
-                   pdfs_smooth: Optional[np.ndarray] = None):
+                   signal_raw: np.ndarray, signal_smooth: np.ndarray, r: Optional[np.ndarray] = None, pdf_raw: Optional[np.ndarray] = None,
+                   pdf_smooth: Optional[np.ndarray] = None):
     """Export time-resoloved data to a file in a npz format suitable for further analysis. UED exports PDFs as well."""
     cmd_options = ' '.join(flags_list)
     metadata = [f"#Command: iamxed {cmd_options}"]
     if args.ued:
-        metadata += ["#Units: times: fs, s: Bohr⁻¹, signals: dI/I (%), r: Å, pdfs: ΔPDF(r) (arb. units)"]
+        metadata += ["#Units: times: fs, s: Bohr⁻¹, signals: dI/I (%), r: Å, pdfs: ΔrPDF(r) (arb. units)"]
     else:
         metadata += ["#Units: times: fs, q: Bohr⁻¹, signals: dI/I (%)"]
     metadata = np.array(metadata, dtype='U')
     if args.ued:  # Include PDFs for UED only
         np.savez(args.export, times=times, times_smooth=times_smooth, s=q, signal_raw=signal_raw,
-            signal_smooth=signal_smooth, r=r, pdfs_raw=pdfs_raw, pdfs_smooth=pdfs_smooth, metadata=metadata)
-        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdfs_raw, pdfs_smooth)), comments=header, header='# q    PDF    convoluted PDF')
+            signal_smooth=signal_smooth, r=r, pdf_raw=pdf_raw, pdf_smooth=pdf_smooth, metadata=metadata)
+        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdf_raw, pdf_smooth)), comments=header, header='# q    PDF    convoluted PDF')
         # logger.info(f"Exporting time-resolved PDF to '{args.export}.npz'.")
         # todo: export readable files in txt
     else:
@@ -282,7 +282,7 @@ def parse_cmd_args() -> argparse.Namespace:
     
     # General options
     general_sec = parser.add_argument_group("General options")
-    general_sec.add_argument('--calculation-type', type=str, choices=['static', 'time-resolved'], default='static',
+    general_sec.add_argument('--signal-type', type=str, choices=['static', 'time-resolved'], default='static',
         help='Either perform static or time-resolved calculation. Static calculation averages signal from all geometries provided. '
              'Time-resolved calculation will treat xyz files as trajectories and will average the signal only within time frames. '
              'Default: static.')
@@ -319,8 +319,8 @@ def parse_cmd_args() -> argparse.Namespace:
     
     # Output options
     out_sec = parser.add_argument_group("Output options")
-    out_sec.add_argument('--log-to-file', action='store_false',
-                        help="Save output to 'iamxed.out'. Default: True.")
+    out_sec.add_argument('--log-to-file-disable', action='store_true',
+                        help="Disable logging output to 'iamxed.out' along with console. Default: False.")
     out_sec.add_argument('--debug', action='store_true',
                         help="Print debug output. Default: False.")
     out_sec.add_argument('--plot-disable', action='store_true',
@@ -329,15 +329,17 @@ def parse_cmd_args() -> argparse.Namespace:
                         help='Flip x and y axes in all plot. Default: False.')
     out_sec.add_argument('--export', type=str,
                         help='Provide a file name to which calculated data will be exported. File will be named as'
-                             ' <filename>.txt. Default: None.')
+                             ' <file_name>.txt for static calculations and <file_name>.npz for time-resolved calculations. '
+                             "Binary npz files are storage efficient and can be read with Numpy in Python using "
+                             "'np.load(<file_name>.npz'. Default: None.")
     out_sec.add_argument('--plot-units', type=str, default='bohr-1', choices=['bohr-1', 'angstrom-1'],
                         help="Units for plotting the q axis, does not affect export: 'bohr-1' (default) or 'angstrom-1'.")
     
     # Grid parameters
     grid_sec = parser.add_argument_group("Grid parameters")
-    grid_sec.add_argument('--qmin', type=nonnegative_float, default=5.29e-9,
+    grid_sec.add_argument('--qmin', type=nonnegative_float, default=0.0,
                          help='Minimum q value (Bohr^-1).')
-    grid_sec.add_argument('--qmax', type=positive_float, default=5.29,
+    grid_sec.add_argument('--qmax', type=positive_float, default=5.292,
                          help='Maximum q value (Bohr^-1).')
     grid_sec.add_argument('--npoints', type=positive_int, default=200,
                          help='Number of q points.')
