@@ -24,13 +24,6 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
 
     pdf_present = (r is not None) and (pdf is not None)
 
-    # get qmin and qmax
-    qmin, qmax = np.min(q), np.max(q)
-
-    # get rmin and rmax if rPDF is present
-    if pdf_present:
-        rmin, rmax = np.min(r), np.max(r)
-
     # Convert units for momentum transfer coordinate if needed
     if plot_units == 'angstrom-1':
         q_plot = q * 1.88973
@@ -46,6 +39,13 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, is_difference: 
             x_label = '$q$ (Bohr$^{-1}$)'
         else:
             x_label = '$s$ (Bohr$^{-1}$)'
+
+    # get qmin and qmax from converted coordinates
+    qmin, qmax = np.min(q_plot), np.max(q_plot)
+
+    # get rmin and rmax if rPDF is present
+    if pdf_present:
+        rmin, rmax = np.min(r), np.max(r)
 
     ### labels and titles
     # pdf
