@@ -274,7 +274,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         if os.path.isdir(geom_file): # getting first geometry from all files in directory
             xyz_files = find_xyz_files(geom_file)
             signals = []
-            for f in xyz_files:
+            for f in tqdm(xyz_files, desc='Files', leave=False):
                 atoms, coords = read_xyz(f) # reading just the first geometry
                 Iat = self.calc_atomic_intensity(atoms)
                 Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
@@ -286,7 +286,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             atoms, trajectory = read_xyz_trajectory(geom_file)
             Iat = self.calc_atomic_intensity(atoms) # Calculate atomic intensity once for all frames (they don't depend on coordinates)
             signals = []
-            for coords in trajectory:
+            for coords in tqdm(trajectory, desc='Geometries', leave=False):
                 Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
                 Itot = Iat + Imol
                 signals.append(Itot)
@@ -528,7 +528,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             xyz_files = find_xyz_files(geom_file)
             signals = []
             pdfs = []
-            for f in xyz_files:
+            for f in tqdm(xyz_files, desc='Files', leave=False):
                 atoms, coords = read_xyz(f) #Note: Currently expects single frame files
                 I, _, r, pdf = calculate_signal_and_pdf(atoms, coords)
                 signals.append(I)
@@ -540,7 +540,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             atoms, trajectory = read_xyz_trajectory(geom_file)
             signals = []
             pdfs = []
-            for coords in trajectory:
+            for coords in tqdm(trajectory, desc='Geometries', leave=False):
                 I, _, r, pdf = calculate_signal_and_pdf(atoms, coords)
                 signals.append(I)
                 pdfs.append(pdf)
