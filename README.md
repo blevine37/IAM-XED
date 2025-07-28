@@ -57,9 +57,9 @@ Total intensity of the scattering signal within IAM is given by
 
 $$I(s) = \sum_{i=1}^{N} f_i(s) + \sum_{j=1}^{N}\sum_{j\neq i}^{N} f_i^*(s) f_j (s) \frac{\sin ( s r_{ij})}{s r_{ij}} = I_\mathrm{at}(s) + I_\mathrm{mol}(s)$$
 
-where $f_i(s)$ is the atomic form factor (AFF) of the $i$-th atom, $r_{ij}$ is the distance between atoms $i$ and $j$, and $s$ is the momentum transfer (or scattering vector). The first term represents the atomic contribution to scattering intensity independent of molecular position, while the second term accounts for the molecular contribution (interference between different atoms in the molecule).
+where $$f_i(s)$$ is the atomic form factor (AFF) of the $$i$$-th atom, $$r_{ij}$$ is the distance between atoms $$i$$ and $$j$$, and $$s$$ is the momentum transfer (or scattering vector). The first term represents the atomic contribution to scattering intensity independent of molecular position, while the second term accounts for the molecular contribution (interference between different atoms in the molecule).
 Two notes on the difference between UED and XRD:
-1. In XRD, the momentum transfer is usually labeled $q$ instead of $s$ in UED but the definition is the same.
+1. In XRD, the momentum transfer is usually labeled $$q$$ instead of $$s$$ in UED but the definition is the same.
 2. In UED, AFFs are complex functions, while in XRD they are real-valued. 
 
 ### Inelastic Compton Scattering
@@ -67,7 +67,7 @@ In XRD, inelastic Compton scattering can be included in the IAM calculations. Th
 
 $$I = I_\mathrm{at} + I_\mathrm{mol} + I_\mathrm{inel}$$
 
-where $I_\mathrm{inel}(s)$ is the inelastic contribution to the scattering intensity. 
+where $$I_\mathrm{inel}(s)$$ is the inelastic contribution to the scattering intensity. 
 Within IAM, the inelastic contribution is independent of molecular geometry.
 
 ### Pair Distribution Function (PDF)
@@ -75,11 +75,11 @@ IAM-XED defines the real-space pair distribution function (PDF) for UED as
 
 $$P(r) = r \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
 
-where $sM(s)$ represents the modified scattering intensity
+where $$sM(s)$$ represents the modified scattering intensity
 
 $$sM(s) = s\frac{I_\mathrm{mol}(s)}{I_\mathrm{at}(s)}.$$
 
-For practical calculations, the integral is limited to a finite range $[s_{min}, s_{max}]$ and damped by a Gaussian smearing factor $\mathrm{e}^{-\alpha s^2}$, leading to the final expression
+For practical calculations, the integral is limited to a finite range $$[s_{min}, s_{max}]$$ and damped by a Gaussian smearing factor $$\mathrm{e}^{-\alpha s^2}$$, leading to the final expression
 
 $$P(r) = r \int_{s_{min}}^{s_{max}} s M(s) \sin(s r) \mathrm{e}^{-\alpha s^2} \mathrm{d}s .$$
 
@@ -90,7 +90,7 @@ The function above is implemented in IAM-XED. The definition comes from:
 
 $$\tilde{P}(r) = \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
 
-which in NOT used in IAM-XED but can be achieved by dividing our PDF by $r$. To distinguish the two definitions, we use term 'rPDF' in IAM-XED to emphasize the multiplication by $r$ in our definition of PDF.
+which in NOT used in IAM-XED but can be achieved by dividing our PDF by $$r$$. To distinguish the two definitions, we use term 'rPDF' in IAM-XED to emphasize the multiplication by $$r$$ in our definition of PDF.
 
 ## Quick start
 IAM-XED is called in the command line with input specified in form of flags.
@@ -164,8 +164,8 @@ Reference geometries are used for calculating the difference signal in static ca
 | `--tmax`                | Maximum time considered (fs).                                                   | None (up to the longest trajectory)     |
 | `--fwhm`                | FWHM parameter for Gaussian temporal convolution (fs).                          | 150.0                                   |
 | `--pdf-alpha`           | PDF damping parameter (Å²).                                                     | 0.04                                    |
-| `--qmin`, `--qmax`      | Momentum transfer range $q$ (or $s$) (Bohr⁻¹).                                  | $0.0$, $5.292$                          |
-| `--npoints`             | Number of $q$-points.                                                           | 200                                     |
+| `--qmin`, `--qmax`      | Momentum transfer range $$q$$ (or $$s$$) (Bohr⁻¹).                              | 0.0, 5.292                          |
+| `--npoints`             | Number of $$q$$-points.                                                           | 200                                     |
 | `--log-to-file-disable` | Disable logging output to a file along with console.                            | False                                   |
 | `--plot-disable`        | Disable plotting of results.                                                    | False                                   |
 | `--export`              | Export data by providing a filename.                                            | None                                    |
@@ -186,13 +186,13 @@ More details on each option can be found in the help message (`iamxed --help`).
 ```bash
 iamxed --xrd --signal-geoms molecule.xyz
 ```
-Calculates scattering intensity $I(q)$ as a function of momentum transfer $q$ (Bohr⁻¹).
+Calculates scattering intensity $$I(q)$$ as a function of momentum transfer $$q$$ (Bohr⁻¹).
 
 **Difference Signal from Single Geometry:**
 ```bash
 iamxed --xrd --signal-geoms excited.xyz --reference-geoms ground.xyz
 ```
-Calculates the relative difference signal: $\Delta I/I_0 = (I_1-I_0)/I_0 \cdot 100\%$ ($I_1$ - signal-geoms, $I_0$ - reference-geoms).
+Calculates the relative difference signal: $$\Delta I/I_0 = (I_1-I_0)/I_0 \cdot 100\%$$ ($$I_1$$ - signal-geoms, $$I_0$$ - reference-geoms).
 
 **Inlcuding Inelastic Scattering for XRD:**
 ```bash
@@ -204,7 +204,7 @@ Includes Compton scattering using Szaloki parameters.
 ```bash
 iamxed --xrd --signal-geoms trajectory.xyz --signal-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40
 ```
-Calculates the time-resolved relative difference scattering signal $\Delta I/I_0 (q,t)$ against the t=0 frame. Momentum coordinate divided to 100 points goes from 0.0 to 10.0 Bohr⁻¹. Timestep is assumed 40 a.t.u.
+Calculates the time-resolved relative difference scattering signal $$\Delta I/I_0 (q,t)$$ against the t=0 frame. Momentum coordinate divided to 100 points goes from 0.0 to 10.0 Bohr⁻¹. Timestep is assumed 40 a.t.u.
 
 **Time-resolved Ensemble Calulation:**
 ```bash
@@ -219,20 +219,20 @@ Calculates the same signal as in trajectory case, averaging over all trajectorie
 ```bash
 iamxed --ued --signal-geoms molecule.xyz
 ```
-Calculates the real-space pair distribution function (rPDF) $P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$. 
+Calculates the real-space pair distribution function (rPDF) $$P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$$. 
 
 
 **Difference Signal from Single Trajectory:**
 ```bash
 iamxed --ued --signal-geoms excited.xyz --reference-geoms ground.xyz
 ```
-Calculates the relative difference signal: $\Delta I/I_0 = (I_1-I_0)/I_0 \cdot 100\%$ ($I_1$ - signal-geoms, $I_0$ - reference-geoms) and $\Delta P(r) = P_1(r)-P_0(r)$.
+Calculates the relative difference signal: $$\Delta I/I_0 = (I_1-I_0)/I_0 \cdot 100\%$$ ($$I_1$$ - signal-geoms, $$I_0$$ - reference-geoms) and $$\Delta P(r) = P_1(r)-P_0(r)$$.
 
 **Time-Resolved Single Trajectory Calculation:**
 ```bash
 iamxed --ued --signal-type time-resolved --signal-geoms trajectory.xyz --timestep 40 --fwhm 100 --pdf-alpha 0.04
 ```
-Calculates time-resolved relative difference signal $\Delta I/I_0 (q,t)$ and $\Delta P(q,t)$ against the $t=0$ frame. Timestep is set to 40 a.t.u., additional temporal smoothing with 100 fs FWHM Gaussian function, $\alpha$ smearing parameter at 0.04 Å².
+Calculates time-resolved relative difference signal $$\Delta I/I_0 (q,t)$$ and $$\Delta P(q,t)$$ against the $$t=0$$ frame. Timestep is set to 40 a.t.u., additional temporal smoothing with 100 fs FWHM Gaussian function, $$\alpha$$ smearing parameter at 0.04 Å².
 
 **Time-resolved Ensemble Calulation:**
 ```bash
