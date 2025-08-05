@@ -1,3 +1,7 @@
+[![Version](https://img.shields.io/badge/Version-1.0.2-blue)](https://github.com/blevine37/IAM-XED/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue)](/LICENSE)
+[![CI tests](https://github.com/blevine37/IAM-XED/actions/workflows/ci.yml/badge.svg)](https://github.com/blevine37/IAM-XED/actions/workflows/ci.yml)
+
 # IAM-XED: Independent Atom Model for X-ray and Electron Diffraction
 
 A Python package for calculating X-ray diffraction (XRD) and ultrafast electron diffraction (UED) signals from molecular geometries and trajectories using the Independent Atom Model (IAM) approximation.
