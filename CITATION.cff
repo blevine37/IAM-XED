@@ -1,0 +1,12 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Jiří
+    given-names: Suchan
+  - family-names: Janoš
+    given-names: Jiří
+    orcid: https://orcid.org/0000-0001-5903-8538
+title: "IAM-XED: Independent Atom Model for X-ray and Electron Diffraction"
+version: 1.0.2
+url: "https://github.com/blevine37/IAM-XED"
+date-released: 2025-08-05
