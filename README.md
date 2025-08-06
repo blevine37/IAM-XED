@@ -1,4 +1,5 @@
 [![Version](https://img.shields.io/badge/Version-1.0.2-blue)](https://github.com/blevine37/IAM-XED/releases)
+[![PyPI version](https://img.shields.io/pypi/v/iamxed)](https://pypi.org/project/iamxed/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](/LICENSE)
 [![CI tests](https://github.com/blevine37/IAM-XED/actions/workflows/ci.yml/badge.svg)](https://github.com/blevine37/IAM-XED/actions/workflows/ci.yml)
 
