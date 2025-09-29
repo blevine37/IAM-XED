@@ -204,8 +204,9 @@ def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, sign
             pdf_header = f'\tr (Å)\t\t\tΔ{pdf_label} (arb. units)'
         else:
             pdf_header = f'\tr (Å)\t\t\t{pdf_label} (arb. units)'
-        np.savetxt(filename + f'_{pdf_label.replace("/", "_")}.txt', np.column_stack((r, pdfs)), header=comment+pdf_header)
-        logger.info(f"Exporting PDF data to '{filename}_{pdf_label.replace("/", "_")}.txt'.")
+        pdf_filename = filename + f'_{pdf_label.replace("/", "_")}.txt'
+        np.savetxt(pdf_filename, np.column_stack((r, pdfs)), header=comment+pdf_header)
+        logger.info(f"Exporting PDF data to '{pdf_filename}'.")
 
 
 def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,

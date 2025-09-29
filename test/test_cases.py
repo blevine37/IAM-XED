@@ -55,6 +55,24 @@ test_cases = [
     },
     {
         "dir": "test/cyclobutanone",
+        "command": "--xrd --signal-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --pdf-mode rpdf --export xrd_diff_FT0 --log-to-file-disable --plot-disable",
+	    "output": "xrd_diff_FT0_rPDF.txt",
+        "reference": "reference_xrd_diff_FT0_rPDF.txt"
+    },
+    {
+        "dir": "test/cyclobutanone",
+        "command": "--xrd --signal-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --pdf-mode pdf --export xrd_diff_FT1 --log-to-file-disable --plot-disable",
+	    "output": "xrd_diff_FT1_PDF.txt",
+        "reference": "reference_xrd_diff_FT1_PDF.txt"
+    },
+    {
+        "dir": "test/cyclobutanone",
+        "command": "--xrd --signal-type static --signal-geoms c3.xyz --reference-geoms cycbut.xyz --qmin 0.0 --qmax 6.0 --npoints 600 --pdf-mode 1/rpdf --export xrd_diff_FT2 --log-to-file-disable --plot-disable",
+	    "output": "xrd_diff_FT2_1_rPDF.txt",
+        "reference": "reference_xrd_diff_FT2_1_rPDF.txt"
+    },
+    {
+        "dir": "test/cyclobutanone",
         "command": "--ued  --signal-geoms cycbut_traj.xyz  --signal-type time-resolved --qmin 0.0 --qmax 5.29 --npoints 53 --pdf-alpha 0.02 --timestep 40 --export ued_traj --log-to-file-disable --plot-disable",
 	    "output": "ued_traj.npz",
         "reference": "reference_ued_traj.npz"
@@ -89,6 +107,9 @@ test_ids = [
     "CYCBUT-ued-c2-min-diff-static-rpdf",
     "CYCBUT-ued-c2-min-diff-static-pdf",
     "CYCBUT-ued-c2-min-diff-static-1rpdf",
+    "CYCBUT-xrd-c3-min-diff-static-rpdf",
+    "CYCBUT-xrd-c3-min-diff-static-pdf",
+    "CYCBUT-xrd-c3-min-diff-static-1rpdf",
     "CYCBUT-ued-traj",
     "CYCBUT-xrd-traj" ,
     "CYCBUT-ued-ensemble",

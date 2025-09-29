@@ -45,7 +45,7 @@ def iamxed(args: Namespace):
                 continue
             if args.ued and key in ['xrd', 'inelastic']:
                 continue
-            elif args.xrd and key in ['ued', 'pdf_alpha']:
+            elif args.xrd and key in ['ued']:
                 continue
 
             add = ''
@@ -201,13 +201,9 @@ def iamxed(args: Namespace):
                     )
                 # Get smoothed time axis for smoothed data
                 if args.export:
-                    if args.ued:  # Include PDFs for UED only
-                        export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
-                            signal_raw=signal_raw, signal_smooth=signal_smooth, r=r, pdf_raw=pdf_raw,
-                            pdf_smooth=pdf_smooth, pdf_mode=args.pdf_mode)
-                    elif args.xrd:
-                        export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
-                            signal_raw=signal_raw, signal_smooth=signal_smooth, pdf_mode=args.pdf_mode)
+                    export_tr_data(args=args, flags_list=argv[1:], times=times, times_smooth=times_smooth, q=q,
+                        signal_raw=signal_raw, signal_smooth=signal_smooth, r=r, pdf_raw=pdf_raw,
+                        pdf_smooth=pdf_smooth, pdf_mode=args.pdf_mode)
         logger.info("Calculation complete!")
     except Exception as e:
         logger.error(f"ERROR: Calculation issued exception: {str(e)}")

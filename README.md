@@ -77,7 +77,7 @@ where $I_\mathrm{inel}(s)$ is the inelastic contribution to the scattering inten
 Within IAM, the inelastic contribution is independent of molecular geometry.
 
 ### Pair Distribution Function (PDF)
-IAM-XED defines the real-space pair distribution function (PDF) for UED as
+IAM-XED defines the real-space pair distribution function (PDF) as
 
 $$P(r) = r \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
 
@@ -89,7 +89,7 @@ For practical calculations, the integral is limited to a finite range $[s_{min},
 
 $$P(r) = r \int_{s_{min}}^{s_{max}} s M(s) \sin(s r) \mathrm{e}^{-\alpha s^2} \mathrm{d}s .$$
 
-The function above is implemented in IAM-XED. The definition comes from:
+The function above is implemented in IAM-XED for both UED and XRD calculations. The definition comes from:
 > Centurion, M., Wolf, T. J., & Yang, J. (2022). Ultrafast imaging of molecules with electron diffraction. Annual Review of Physical Chemistry, 73, 21-42.
 
 > [!WARNING]
@@ -179,7 +179,7 @@ Reference geometries are used for calculating the difference signal in static ca
 | `--tmax`                | Maximum time considered (fs).                                                   | None (up to the longest trajectory)     |
 | `--fwhm`                | FWHM parameter for Gaussian temporal convolution (fs).                          | 150.0                                   |
 | `--pdf-alpha`           | PDF damping parameter (Å²).                                                     | 0.04                                    |
-| `--pdf-mode`            | Output mode for PDF transform in UED calculations: `rpdf`, `pdf`, or `1/rpdf`. | `rpdf`                                  |
+| `--pdf-mode`            | Output mode for PDF transform: `rpdf`, `pdf`, or `1/rpdf`.                     | `rpdf`                                  |
 | `--qmin`, `--qmax`      | Momentum transfer range $q$ (or $s$) (Bohr⁻¹).                              | 0.0, 5.292                              |
 | `--npoints`             | Number of $q$-points.                                                         | 200                                     |
 | `--log-to-file-disable` | Disable logging output to a file along with the console.                        | False                                   |
@@ -202,13 +202,13 @@ Momentum coordinate in plots and export is labelled $q$ for XRD.
 ```bash
 iamxed --xrd --signal-geoms molecule.xyz
 ```
-Calculates scattering intensity $I(q)$ as a function of momentum transfer $q$ (Bohr⁻¹).
+Calculates scattering intensity $I(q)$ as a function of momentum transfer $q$ (Bohr⁻¹) and and pair distribution function $P(r)$.
 
 **Difference Signal from Single Geometry:**
 ```bash
 iamxed --xrd --signal-geoms excited.xyz --reference-geoms ground.xyz
 ```
-Calculates the relative difference signal: $\Delta I/I_0 = (I_1-I_0)/I_0 \cdot 100\%$ ($I_1$ - signal-geoms, $I_0$ - reference-geoms).
+Calculates the relative difference signal: $\Delta I/I_0 = (I_1-I_0)/I_0 \cdot 100\%$ ($I_1$ - signal-geoms, $I_0$ - reference-geoms) and $\Delta P(r) = P_1(r)-P_0(r)$.
 
 **Including Inelastic Scattering for XRD:**
 ```bash
@@ -218,13 +218,13 @@ Includes Compton scattering using Szaloki parameters.
 
 **Time-resolved Single Trajectory Calculation:**
 ```bash
-iamxed --xrd --signal-geoms trajectory.xyz --signal-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40
+iamxed --xrd --signal-geoms trajectory.xyz --signal-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40 --pdf-alpha 0.04
 ```
-Calculates the time-resolved relative difference scattering signal $\Delta I/I_0 (q,t)$ against the t=0 frame. Momentum coordinate divided to 100 points goes from 0.0 to 10.0 Bohr⁻¹. Timestep is assumed 40 a.t.u.
+Calculates the time-resolved relative difference scattering signal $\Delta I/I_0 (q,t)$ and $\Delta P(r,t)$ against the t=0 frame. Momentum coordinate divided to 100 points goes from 0.0 to 10.0 Bohr⁻¹. Timestep is assumed 40 a.t.u., $\alpha$ smearing parameter at 0.04 Å².
 
 **Time-resolved Ensemble Calculation:**
 ```bash
-iamxed --xrd --signal-geoms ./ensemble_dir/ --signal-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40 --tmax 500
+iamxed --xrd --signal-geoms ./ensemble_dir/ --signal-type time-resolved --qmin 0.0 --qmax 10.0 --npoints 100 --timestep 40 --tmax 500 --pdf-alpha 0.04
 ```
 Calculates the same signal as in the trajectory case, averaging over all trajectories in the `./ensemble_dir/` folder up to 500 fs.
 
@@ -260,7 +260,7 @@ Calculates the same signal as in the trajectory case, averaging over all traject
 
 ### Static Calculations
 - `export.txt`: Signal data with units in header
-- `export_rPDF.txt`:rPDF data (UED only)
+- `export_rPDF.txt`, `export_PDF.txt`, or `export_1_rPDF.txt`: PDF data (available for both UED and XRD), filename depends on `--pdf-mode` setting
 
 ### Time-Resolved Calculations  
 - `export.npz`: Binary archive containing:
