@@ -43,6 +43,11 @@ class BaseDiffractionCalculator(ABC):
         """Load form factors for the calculation."""
         pass # placeholder for abstract method which is implemented in subclasses
         
+    @abstractmethod
+    def calc_atomic_intensity(self, atoms: List[str]) -> np.ndarray:
+        """Calculate atomic intensity for the specific diffraction type."""
+        pass
+        
     def calc_molecular_intensity(self, aafs: List[np.ndarray], coords: np.ndarray) -> np.ndarray:
         """Calculate molecular intensity."""
         Imol = np.zeros_like(self.qfit, dtype=float)
@@ -156,6 +161,266 @@ class BaseDiffractionCalculator(ABC):
         logger.debug("[DEBUG]: Finished Fourier transform for PDF calculation (mode=%s)", mode)
 
         return Tr
+
+    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+        """Calculate single geometry pattern and PDF, or average over all geometries in a directory or trajectory file."""
+        import os
+        from .io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
+
+        def calculate_signal_and_pdf(atoms: List[str], coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+            """Calculate signal and PDF for a single geometry."""
+            Iat = self.calc_atomic_intensity(atoms)
+            Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
+            I = Iat + Imol  # Total intensity
+            sm = self.qfit * (Imol / Iat)
+            q_ang = self.qfit / BH_TO_ANG
+            sm_ang = sm / BH_TO_ANG
+            r = q_ang.copy()
+            pdf = self.FT(r, q_ang, sm_ang, pdf_alpha, mode=pdf_mode)
+            return I, r, pdf
+
+        if os.path.isdir(geom_file):
+            xyz_files = find_xyz_files(geom_file)
+            signals = []
+            pdfs = []
+            for f in tqdm(xyz_files, desc='Files', leave=False):
+                atoms, coords = read_xyz(f) # reading just the first geometry
+                I, r, pdf = calculate_signal_and_pdf(atoms, coords)
+                signals.append(I)
+                pdfs.append(pdf)
+            avg_signal = np.mean(signals, axis=0)
+            avg_pdf = np.mean(pdfs, axis=0)
+            return self.qfit, avg_signal, r, avg_pdf
+        elif is_trajectory_file(geom_file):
+            atoms, trajectory = read_xyz_trajectory(geom_file)
+            signals = []
+            pdfs = []
+            for coords in tqdm(trajectory, desc='Geometries', leave=False):
+                I, r, pdf = calculate_signal_and_pdf(atoms, coords)
+                signals.append(I)
+                pdfs.append(pdf)
+            avg_signal = np.mean(signals, axis=0)
+            avg_pdf = np.mean(pdfs, axis=0)
+            return self.qfit, avg_signal, r, avg_pdf
+        else:
+            atoms, coords = read_xyz(geom_file)
+            I, r, pdf = calculate_signal_and_pdf(atoms, coords)
+            return self.qfit, I, r, pdf
+
+    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+        """Calculate difference between two geometries and their PDFs.
+
+        Returns relative difference (I1-I2)/I2 * 100 as percentage.
+        Atom order does not need to match, only the sets of elements must be the same.
+        If either geom1 or geom2 is a directory or trajectory file, ensemble averaging will be performed.
+        """
+        # Get signals and PDFs for both inputs using calc_single
+        logger.info("* Signal calculation")
+        _, I1, r1, pdf1 = self.calc_single(geom1, pdf_alpha, pdf_mode)
+        logger.info("* Reference calculation")
+        _, I2, r2, pdf2 = self.calc_single(geom2, pdf_alpha, pdf_mode)
+        
+        # Calculate relative difference in percent
+        logger.info("* Difference calculation")
+        diff_signal = (I1 - I2) / I2 * 100
+        pdf_diff = pdf1 - pdf2  # Calculate PDF difference
+        
+        return self.qfit, diff_signal, r1, pdf_diff
+
+    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Calculate time-resolved pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.
+        
+        Args:
+            trajfile: Path to trajectory file
+            timestep_au: Time step in atomic units
+            fwhm_fs: FWHM of Gaussian smoothing in fs
+            pdf_alpha: Damping parameter for PDF calculation
+            tmax_fs: Maximum time to calculate up to in femtoseconds
+        
+        Returns:
+            times: Time points in fs
+            q: Q-grid in atomic units
+            signal_raw: Raw signal (not smoothed)
+            times_smooth: Smoothed time points
+            signal_smooth: Gaussian smoothed signal
+            r: R-grid for PDF in Angstroms
+            pdf_raw: Raw PDFs (not smoothed)
+            pdf_smooth: Gaussian smoothed PDFs
+        """
+        logger.info("* Fetching trajectory data.")
+        atoms, trajectory = read_xyz_trajectory(trajfile)
+
+        # Calculate reference (t=0) intensities
+        logger.info("* Calculating reference intensity I0 = I(0).")
+        Iat0 = self.calc_atomic_intensity(atoms)
+        Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
+        I0 = Iat0 + Imol0
+        
+        signals = []
+        dt_fs = timestep_au * AU_TO_FS  # Convert timestep to fs
+
+        sM0 = self.qfit * (Imol0 / Iat0)
+        pdfs = []
+
+        # Calculate q grid in Angstroms for PDF
+        q_ang = self.qfit / BH_TO_ANG
+        r = q_ang.copy()
+
+        if tmax_fs is not None:
+            n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
+        else:
+            n_frames = len(trajectory)
+
+        # Loop over frames
+        logger.info("* Calculating signal along the trajectory.")
+        for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
+            # Check if we've reached the time limit
+            current_time = i * dt_fs
+            if tmax_fs is not None and current_time > tmax_fs:
+                break
+
+            # Calculate current frame intensities
+            Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
+            I = Iat0 + Imol
+
+            # Calculate relative difference in percent
+            rel = (I - I0) / I0 * 100
+            signals.append(rel)
+
+            sM = self.qfit * (Imol / Iat0)
+            dsM = sM - sM0
+
+            # Calculate PDF for this frame using provided alpha
+            sM_ang = dsM / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
+            pdf = self.FT(r, q_ang, sM_ang, pdf_alpha, mode=pdf_mode)
+            pdfs.append(pdf)
+
+        signal_raw = np.array(signals).T
+        pdf_raw = np.array(pdfs).T      # Shape: [r_points, time_points]
+
+        # Calculate time axis for the frames we actually processed
+        times = np.arange(len(signals)) * dt_fs
+
+        # Smooth signals and PDFs separately
+        logger.info("* Convoluting the signal with Gaussian kernel.")
+        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
+        pdf_smooth, _ = self.gaussian_smooth_2d_time(pdf_raw, times, fwhm_fs)
+
+        return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth
+
+    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Calculate ensemble average of trajectories and their PDFs.
+
+        Returns relative differences (I(t)-I(0))/I(0) * 100 as percentage.
+        For each time point, average over all available trajectories.
+
+        Args:
+            xyz_dir: Directory containing XYZ trajectory files
+            timestep_au: Time step in atomic units
+            fwhm_fs: FWHM of Gaussian smoothing in fs
+            pdf_alpha: Damping parameter for PDF calculation
+            tmax_fs: Maximum time to calculate up to in femtoseconds
+        """
+        logger.debug("[DEBUG]: Starting ensemble average calculation for trajectories")
+
+        xyz_files = find_xyz_files(xyz_dir)
+        all_Imol = []
+        all_sM = []
+        max_frames = 0
+        dt_fs = timestep_au * AU_TO_FS
+        Iat0 = None
+
+        # Calculate q grid in Angstroms for PDF
+        q_ang = self.qfit / BH_TO_ANG
+        r = q_ang.copy()
+
+        logger.info('* Calculating signal for individual trajectories.')
+        for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Trajectory files', leave=False)):
+            atoms, trajectory = read_xyz_trajectory(xyz_file)
+            if Iat0 is None:
+                Iat0 = self.calc_atomic_intensity(atoms)
+            Imol_traj = []
+            sM_traj = []
+            if tmax_fs is not None:
+                n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
+            else:
+                n_frames = len(trajectory)
+            # Loop over frames
+            for i, frame in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
+                # Check if we've reached the time limit
+                current_time = i * dt_fs
+                if tmax_fs is not None and current_time > tmax_fs:
+                    break
+                Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], frame)
+                Imol_traj.append(Imol)
+                sM = self.qfit * (Imol / Iat0)
+                sM_traj.append(sM)
+            Imol_traj = np.array(Imol_traj).T
+            all_Imol.append(Imol_traj)
+            sM_traj = np.array(sM_traj).T  # [q, t]
+            all_sM.append(sM_traj)
+            max_frames = max(max_frames, sM_traj.shape[1])
+
+        logger.info('* Handling trajectories shorter than tmax (not contributing to ensemble average for longer times than their duration).')
+        # getting trajectories ending prematurely
+        for idx, traj in enumerate(all_Imol):
+            traj_frames = traj.shape[1]
+            if traj_frames < max_frames:
+                logger.warning(f" - Trajectory {xyz_files[idx]} has fewer frames ({traj_frames}) than the maximum ({max_frames}).")
+
+        # Pad all sM and Imol to max_frames with NaN
+        # Padding Imol
+        padded_Imol = []
+        for Imol in all_Imol:
+            if Imol.shape[1] < max_frames:
+                pad_width = ((0, 0), (0, max_frames - Imol.shape[1]))
+                padded = np.pad(Imol, pad_width, mode='constant', constant_values=np.nan)
+            else:
+                padded = Imol
+            padded_Imol.append(padded)
+        # Padding sM
+        padded_sM = []
+        for sM in all_sM:
+            if sM.shape[1] < max_frames:
+                pad_width = ((0, 0), (0, max_frames - sM.shape[1]))
+                padded = np.pad(sM, pad_width, mode='constant', constant_values=np.nan)
+            else:
+                padded = sM
+            padded_sM.append(padded)
+
+        # ensemble average
+        logger.info('* Averaging signal over the ensemble of trajectories.')
+        Imol_stacked = np.stack(padded_Imol, axis=0)  # [n_traj, q, t]
+        mean_Imol = np.nanmean(Imol_stacked, axis=0) # [q, t]
+        mean_Imol0 = np.nanmean(Imol_stacked[:,:,0], axis=0) # [q,] - average at t=0
+        stacked_sM = np.stack(padded_sM, axis=0)  # [n_traj, q, t]
+        mean_sM = np.nanmean(stacked_sM, axis=0)   # [q, t]
+        mean_sM0 = np.nanmean(stacked_sM[:, :, 0], axis=0)  # [q] - average at t=0
+        
+        if Iat0 is None: # this should be unnecessary since we check we have some trajectory files
+            logger.error(f"ERROR: No valid trajectories found to compute atomic intensity (Iat0).")
+            raise ValueError("No valid trajectories found to compute atomic intensity (Iat0).")
+        logger.info('* Signal averaged over trajectories.')
+
+        logger.info('* Calculating the difference signal by subtracting reference.')
+        numerator = mean_Imol - mean_Imol0[:, None] # [:, None] casts (N,) array to (N, 1) for element-wise operations
+        denominator = Iat0[:, None] + mean_Imol0[:, None]
+        dIoverI = numerator / denominator * 100
+
+        # Now calculate PDF from the final signal
+        # Final signal: mean_s(t) - mean_s(0)
+        logger.info('* Calculating PDF from averaged signal.')
+        sm_ang = (mean_sM - mean_sM0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
+        pdf_raw = np.empty((len(q_ang), sm_ang.shape[1]))
+        for t in range(sm_ang.shape[1]):
+            pdf_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha, mode=pdf_mode)
+
+        logger.info('* Convoluting singal in time with Gaussian kernel.')
+        times = np.arange(max_frames) * dt_fs
+        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
+        pdf_smooth, _ = self.gaussian_smooth_2d_time(pdf_raw, times, fwhm_fs)
+
+        return times, self.qfit, dIoverI, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth
 
 class XRDDiffractionCalculator(BaseDiffractionCalculator):
     """Calculate XRD patterns using IAM approximation."""
@@ -283,266 +548,6 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         inel = calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, self.qfit * ANG_TO_BH / (4 * np.pi))
         return inel
 
-    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
-        """Calculate single geometry XRD pattern and PDF, or average over all geometries in a directory or trajectory file."""
-        import os
-        from .io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
-
-        def calculate_signal_and_pdf(atoms: List[str], coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-            """Calculate signal and PDF for a single geometry."""
-            Iat = self.calc_atomic_intensity(atoms)
-            Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            I = Iat + Imol  # Total intensity
-            sm = self.qfit * (Imol / Iat)
-            q_ang = self.qfit / BH_TO_ANG
-            sm_ang = sm / BH_TO_ANG
-            r = q_ang.copy()
-            pdf = self.FT(r, q_ang, sm_ang, pdf_alpha, mode=pdf_mode)
-            return I, r, pdf
-
-        if os.path.isdir(geom_file):
-            xyz_files = find_xyz_files(geom_file)
-            signals = []
-            pdfs = []
-            for f in tqdm(xyz_files, desc='Files', leave=False):
-                atoms, coords = read_xyz(f) # reading just the first geometry
-                I, r, pdf = calculate_signal_and_pdf(atoms, coords)
-                signals.append(I)
-                pdfs.append(pdf)
-            avg_signal = np.mean(signals, axis=0)
-            avg_pdf = np.mean(pdfs, axis=0)
-            return self.qfit, avg_signal, r, avg_pdf
-        elif is_trajectory_file(geom_file):
-            atoms, trajectory = read_xyz_trajectory(geom_file)
-            signals = []
-            pdfs = []
-            for coords in tqdm(trajectory, desc='Geometries', leave=False):
-                I, r, pdf = calculate_signal_and_pdf(atoms, coords)
-                signals.append(I)
-                pdfs.append(pdf)
-            avg_signal = np.mean(signals, axis=0)
-            avg_pdf = np.mean(pdfs, axis=0)
-            return self.qfit, avg_signal, r, avg_pdf
-        else:
-            atoms, coords = read_xyz(geom_file)
-            I, r, pdf = calculate_signal_and_pdf(atoms, coords)
-            return self.qfit, I, r, pdf
-
-    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
-        """Calculate difference between two geometries and their PDFs.
-
-        For XRD, returns relative difference (I1-I2)/I2 * 100 as percentage.
-        Atom order does not need to match, only the sets of elements must be the same.
-        If either geom1 or geom2 is a directory or trajectory file, ensemble averaging will be performed.
-        """
-        # Get signals and PDFs for both inputs using calc_single
-        logger.info("* Signal calculation")
-        _, I1, r1, pdf1 = self.calc_single(geom1, pdf_alpha, pdf_mode)
-        logger.info("* Reference calculation")
-        _, I2, r2, pdf2 = self.calc_single(geom2, pdf_alpha, pdf_mode)
-        
-        # Calculate relative difference in percent
-        logger.info("* Difference calculation")
-        diff = (I1 - I2) / I2 * 100
-        pdf_diff = pdf1 - pdf2  # Calculate PDF difference
-        
-        return self.qfit, diff, r1, pdf_diff
-
-    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Calculate time-resolved XRD pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.
-        
-        Args:
-            trajfile: Path to trajectory file
-            timestep_au: Time step in atomic units
-            fwhm_fs: FWHM of Gaussian smoothing in fs
-            pdf_alpha: Damping parameter for PDF calculation
-            tmax_fs: Maximum time to calculate up to in femtoseconds
-        
-        Returns:
-            times: Time points in fs
-            q: Q-grid in atomic units
-            signal_raw: Raw signal (not smoothed)
-            times_smooth: Smoothed time points
-            signal_smooth: Gaussian smoothed signal
-            r: R-grid for PDF in Angstroms
-            pdf_raw: Raw PDFs (not smoothed)
-            pdf_smooth: Gaussian smoothed PDFs
-        """
-        logger.info("* Fetching trajectory data.")
-        atoms, trajectory = read_xyz_trajectory(trajfile)
-
-        # Calculate reference (t=0) intensities
-        logger.info("* Calculating reference intensity I0 = I(0).")
-        Iat0 = self.calc_atomic_intensity(atoms)
-        Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
-        I0 = Iat0 + Imol0
-        
-        signals = []
-        dt_fs = timestep_au * AU_TO_FS  # Convert timestep to fs
-
-        sM0 = self.qfit * (Imol0 / Iat0)
-        pdfs = []
-
-        # Calculate q grid in Angstroms for PDF
-        q_ang = self.qfit / BH_TO_ANG
-        r = q_ang.copy()
-
-        if tmax_fs is not None:
-            n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
-        else:
-            n_frames = len(trajectory)
-
-        #Loop over frames
-        logger.info("* Calculating signal along the trajectory.")
-        for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
-            # Check if we've reached the time limit
-            current_time = i * dt_fs
-            if tmax_fs is not None and current_time > tmax_fs:
-                break
-
-            # Calculate current frame intensities
-            Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            I = Iat0 + Imol
-
-            # Calculate relative difference in percent
-            rel = (I - I0) / I0 * 100
-            signals.append(rel)
-
-            sM = self.qfit * (Imol / Iat0)
-            dsM = sM - sM0
-
-            # Calculate PDF for this frame using provided alpha
-            sM_ang = dsM / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
-            pdf = self.FT(r, q_ang, sM_ang, pdf_alpha, mode=pdf_mode)
-            pdfs.append(pdf)
-
-        signal_raw = np.array(signals).T
-        pdf_raw = np.array(pdfs).T      # Shape: [r_points, time_points]
-
-        # Calculate time axis for the frames we actually processed
-        times = np.arange(len(signals)) * dt_fs
-
-        # Smooth signals and PDFs separately
-        logger.info("* Convoluting the signal with Gaussian kernel.")
-        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
-        pdf_smooth, _ = self.gaussian_smooth_2d_time(pdf_raw, times, fwhm_fs)
-
-        return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth
-
-    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Calculate ensemble average of trajectories and their PDFs.
-
-        Returns relative differences (I(t)-I(0))/I(0) * 100 as percentage.
-        For each time point, average over all available trajectories.
-
-        Args:
-            xyz_dir: Directory containing XYZ trajectory files
-            timestep_au: Time step in atomic units
-            fwhm_fs: FWHM of Gaussian smoothing in fs
-            pdf_alpha: Damping parameter for PDF calculation
-            tmax_fs: Maximum time to calculate up to in femtoseconds
-        """
-        logger.debug("[DEBUG]: Starting ensemble average calculation for XRD trajectories")
-
-        xyz_files = find_xyz_files(xyz_dir)
-        all_Imol = []
-        all_sM = []
-        max_frames = 0
-        dt_fs = timestep_au * AU_TO_FS
-        Iat0 = None
-
-        # Calculate q grid in Angstroms for PDF
-        q_ang = self.qfit / BH_TO_ANG
-        r = q_ang.copy()
-
-        logger.info('* Calculating signal for individual trajectories.')
-        for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Trajectory files', leave=False)):
-            atoms, trajectory = read_xyz_trajectory(xyz_file)
-            if Iat0 is None:
-                Iat0 = self.calc_atomic_intensity(atoms)
-            Imol_traj = []
-            sM_traj = []
-            if tmax_fs is not None:
-                n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
-            else:
-                n_frames = len(trajectory)
-            #Loop over frames
-            for i, frame in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
-                # Check if we've reached the time limit
-                current_time = i * dt_fs
-                if tmax_fs is not None and current_time > tmax_fs:
-                    break
-                Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], frame)
-                Imol_traj.append(Imol)
-                sM = self.qfit * (Imol / Iat0)
-                sM_traj.append(sM)
-            Imol_traj = np.array(Imol_traj).T
-            all_Imol.append(Imol_traj)
-            sM_traj = np.array(sM_traj).T  # [q, t]
-            all_sM.append(sM_traj)
-            max_frames = max(max_frames, sM_traj.shape[1])
-
-        logger.info('* Handling trajectories shorter than tmax (not contributing to ensemble average for longer times than their duration).')
-        # getting trajectories ending prematurely
-        for idx, traj in enumerate(all_Imol):
-            traj_frames = traj.shape[1]
-            if traj_frames < max_frames:
-                logger.warning(f" - Trajectory {xyz_files[idx]} has fewer frames ({traj_frames}) than the maximum ({max_frames}).")
-
-        # Pad all sM and Imol to max_frames with NaN
-        # Padding Imol
-        padded_Imol = []
-        for Imol in all_Imol:
-            if Imol.shape[1] < max_frames:
-                pad_width = ((0, 0), (0, max_frames - Imol.shape[1]))
-                padded = np.pad(Imol, pad_width, mode='constant', constant_values=np.nan)
-            else:
-                padded = Imol
-            padded_Imol.append(padded)
-        # Padding sM
-        padded_sM = []
-        for sM in all_sM:
-            if sM.shape[1] < max_frames:
-                pad_width = ((0, 0), (0, max_frames - sM.shape[1]))
-                padded = np.pad(sM, pad_width, mode='constant', constant_values=np.nan)
-            else:
-                padded = sM
-            padded_sM.append(padded)
-
-        # ensemble average
-        logger.info('* Averaging signal over the ensemble of trajectories.')
-        Imol_stacked = np.stack(padded_Imol, axis=0)  # [n_traj, q, t]
-        mean_Imol = np.nanmean(Imol_stacked, axis=0) # [q, t]
-        mean_Imol0 = np.nanmean(Imol_stacked[:,:,0], axis=0) # [q,] - average at t=0
-        stacked_sM = np.stack(padded_sM, axis=0)  # [n_traj, q, t]
-        mean_sM = np.nanmean(stacked_sM, axis=0)   # [q, t]
-        mean_sM0 = np.nanmean(stacked_sM[:, :, 0], axis=0)  # [q] - average at t=0
-        
-        if Iat0 is None: # this should be unnecessary since we check we have some trajectory files
-            logger.error(f"ERROR: No valid trajectories found to compute atomic intensity (Iat0).")
-            raise ValueError("No valid trajectories found to compute atomic intensity (Iat0).")
-        logger.info('* Signal averaged over trajectories.')
-
-        logger.info('* Calculating the difference signal by subtracting reference.')
-        numerator = mean_Imol - mean_Imol0[:, None] # [:, None] casts (N,) array to (N, 1) for element-wise operations
-        denominator = Iat0[:, None] + mean_Imol0[:, None]
-        dIoverI = numerator / denominator * 100
-
-        # Now calculate PDF from the final signal
-        # Final signal: mean_s(t) - mean_s(0)
-        logger.info('* Calculating PDF from averaged signal.')
-        sm_ang = (mean_sM - mean_sM0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
-        pdf_raw = np.empty((len(q_ang), sm_ang.shape[1]))
-        for t in range(sm_ang.shape[1]):
-            pdf_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha, mode=pdf_mode)
-
-        logger.info('* Convoluting singal in time with Gaussian kernel.')
-        times = np.arange(max_frames) * dt_fs
-        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
-        pdf_smooth, _ = self.gaussian_smooth_2d_time(pdf_raw, times, fwhm_fs)
-
-        return times, self.qfit, dIoverI, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth
-
 class UEDDiffractionCalculator(BaseDiffractionCalculator):
     """UED-specific calculator implementation."""
 
@@ -585,252 +590,3 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             ff = self.form_factors[atom]  # Complex form factor
             Iat += np.real(ff * np.conjugate(ff))  # Multiply by conjugate to get real intensity
         return Iat
-
-    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
-        """Calculate single geometry UED pattern and PDF, or average over all geometries in a directory or trajectory file."""
-        import os
-        from .io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
-
-        def calculate_signal_and_pdf(atoms: List[str], coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-            """Calculate signal and PDF for a single geometry."""
-            Iat = self.calc_atomic_intensity(atoms)
-            Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            I = Iat + Imol  # Total intensity
-            sm = self.qfit * (Imol / Iat)
-            q_ang = self.qfit / BH_TO_ANG
-            sm_ang = sm / BH_TO_ANG
-            r = q_ang.copy()
-            pdf = self.FT(r, q_ang, sm_ang, pdf_alpha, mode=pdf_mode)
-            return I, r, pdf
-
-        if os.path.isdir(geom_file):
-            xyz_files = find_xyz_files(geom_file)
-            signals = []
-            pdfs = []
-            for f in tqdm(xyz_files, desc='Files', leave=False):
-                atoms, coords = read_xyz(f) #Note: Currently expects single frame files
-                I, r, pdf = calculate_signal_and_pdf(atoms, coords)
-                signals.append(I)
-                pdfs.append(pdf)
-            avg_signal = np.mean(signals, axis=0)
-            avg_pdf = np.mean(pdfs, axis=0)
-            return self.qfit, avg_signal, r, avg_pdf
-        elif is_trajectory_file(geom_file):
-            atoms, trajectory = read_xyz_trajectory(geom_file)
-            signals = []
-            pdfs = []
-            for coords in tqdm(trajectory, desc='Geometries', leave=False):
-                I, r, pdf = calculate_signal_and_pdf(atoms, coords)
-                signals.append(I)
-                pdfs.append(pdf)
-            avg_signal = np.mean(signals, axis=0)
-            avg_pdf = np.mean(pdfs, axis=0)
-            return self.qfit, avg_signal, r, avg_pdf
-        else:
-            atoms, coords = read_xyz(geom_file)
-            I, r, pdf = calculate_signal_and_pdf(atoms, coords)
-
-            return self.qfit, I, r, pdf
-
-    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
-        """Calculate difference between two geometries and its PDF.
-
-        Atom order does not need to match, only the sets of elements must be the same.
-        If either geom1 or geom2 is a directory or trajectory file, ensemble averaging will be performed.
-        """
-        # Get signals and PDFs for both inputs using calc_single
-        logger.info("* Signal calculation")
-
-        _, I1, r1, pdf1 = self.calc_single(geom1, pdf_alpha, pdf_mode)
-        logger.info("* Reference calculation")
-        _, I2, r2, pdf2 = self.calc_single(geom2, pdf_alpha, pdf_mode)
-
-        logger.info("* Difference calculation")
-        dIoverI = (I1 - I2) / I2 * 100  # dI/I
-        pdf_diff = pdf1 - pdf2  # Calculate PDF difference
-
-        return self.qfit, dIoverI, r1, pdf_diff
-
-    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0,
-                        pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None,
-                        pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Calculate time-resolved UED pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.
-
-        Args:
-            trajfile: Path to trajectory file
-            timestep_au: Time step in atomic units
-            fwhm_fs: FWHM of Gaussian smoothing in fs
-            pdf_alpha: Damping parameter for PDF calculation
-            tmax_fs: Maximum time to calculate up to in femtoseconds
-
-        Returns:
-            times: Time points in fs
-            q: Q-grid in atomic units
-            signal_raw: Raw signal (not smoothed)
-            signal_smooth: Gaussian smoothed signal
-            r: R-grid for PDF in Angstroms
-            pdf_raw: Raw PDFs (not smoothed)
-            pdf_smooth: Gaussian smoothed PDFs
-        """
-        logger.info("* Fetching trajectory data.")
-        atoms, trajectory = read_xyz_trajectory(trajfile)
-
-        # Calculate reference (t=0) intensities
-        logger.info("* Calculating reference intensity I0 = I(0).")
-        Iat = self.calc_atomic_intensity(atoms)
-        Imol0 = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], trajectory[0])
-        I0 = Iat + Imol0
-
-        signals = []
-        dt_fs = timestep_au * AU_TO_FS  # Convert timestep to fs
-
-        sM0 = self.qfit * (Imol0 / Iat)
-        pdfs = []
-
-        # Calculate q grid in Angstroms for PDF
-        q_ang = self.qfit / BH_TO_ANG
-        r = q_ang.copy()
-
-        if tmax_fs is not None:
-            n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
-        else:
-            n_frames = len(trajectory)
-
-        logger.info("* Calculating signal along the trajectory.")
-        for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
-            # Check if we've reached the time limit
-            current_time = i * dt_fs
-            if tmax_fs is not None and current_time > tmax_fs:
-                break
-
-            Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-            I = Iat + Imol
-            rel = (I - I0) / I0 * 100
-            signals.append(rel)
-
-            sM = self.qfit * (Imol / Iat)
-            dsM = sM - sM0
-
-            # Calculate PDF for this frame using provided alpha
-            sM_ang = dsM / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
-            pdf = self.FT(r, q_ang, sM_ang, pdf_alpha, mode=pdf_mode)
-            pdfs.append(pdf)
-
-        signal_raw = np.array(signals).T
-        pdf_raw = np.array(pdfs).T      # Shape: [r_points, time_points]
-
-        # Calculate time axis for the frames we actually processed
-        times = np.arange(len(signals)) * dt_fs
-
-        # Smooth signals and PDFs separately
-        logger.info("* Convoluting the signal with Gaussian kernel.")
-        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(signal_raw, times, fwhm_fs)
-        pdf_smooth, _ = self.gaussian_smooth_2d_time(pdf_raw, times, fwhm_fs)
-
-        return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth
-
-    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0,
-                      pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None,
-                      pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Calculate ensemble-averaged signal and PDF from a directory of trajectories, matching the interface of calc_trajectory.
-        For each time point, average over all available trajectories.
-
-        Args:
-            xyz_dir: Directory containing XYZ trajectory files
-            timestep_au: Time step in atomic units
-            fwhm_fs: FWHM of Gaussian smoothing in fs
-            pdf_alpha: Damping parameter for PDF calculation
-            tmax_fs: Maximum time to calculate up to in femtoseconds
-        """
-        xyz_files = find_xyz_files(xyz_dir)
-        all_Imol = []
-        max_frames = 0
-        dt_fs = timestep_au * AU_TO_FS
-        sfit = self.qfit
-        q_ang = self.qfit * ANG_TO_BH # Convert q to Angstrom^-1 for PDF calculation
-        r = q_ang.copy()
-        Iat0 = None
-        all_sM = []  # Will hold s_k(t) for each trajectory
-
-        logger.info('* Calculating signal for individual trajectories.')
-        for idx, xyz_file in enumerate(tqdm(xyz_files, desc='Trajectory files', leave=False)):
-            atoms, trajectory = read_xyz_trajectory(xyz_file)
-            if Iat0 is None:
-                Iat0 = self.calc_atomic_intensity(atoms)
-            Imol_traj = []
-            sM_traj = []
-            if tmax_fs is not None:
-                n_frames = min(len(trajectory), int(np.floor(tmax_fs / dt_fs)) + 1)
-            else:
-                n_frames = len(trajectory)
-            # Loop over frames
-            for i, coords in enumerate(tqdm(trajectory[:n_frames], desc='Geometries', leave=False, total=n_frames, mininterval=0, dynamic_ncols=True)):
-                # Check if we've reached the time limit
-                current_time = i * dt_fs
-                if tmax_fs is not None and current_time > tmax_fs:
-                    break
-                Imol = self.calc_molecular_intensity([self.form_factors[a] for a in atoms], coords)
-                Imol_traj.append(Imol)
-                sM = sfit * (Imol / Iat0)
-                sM_traj.append(sM)
-            Imol_traj = np.array(Imol_traj).T
-            all_Imol.append(Imol_traj)
-            sM_traj = np.array(sM_traj).T  # [q, t]
-            all_sM.append(sM_traj)
-            max_frames = max(max_frames, sM_traj.shape[1])
-
-        logger.info('* Handling trajectories shorter than tmax (not contributing to ensemble average for longer times than their duration).')
-        # getting trajectories ending prematurely
-        for idx, traj in enumerate(all_Imol):
-            traj_frames = traj.shape[1]
-            if traj_frames < max_frames:
-                logger.warning(f" - Trajectory {xyz_files[idx]} has fewer frames ({traj_frames}) than the maximum ({max_frames}).")
-
-        # Pad all sM and Imol to max_frames with NaN
-        # Padding Imol
-        padded_Imol = []
-        for Imol in all_Imol:
-            if Imol.shape[1] < max_frames:
-                pad_width = ((0, 0), (0, max_frames - Imol.shape[1]))
-                padded = np.pad(Imol, pad_width, mode='constant', constant_values=np.nan)
-            else:
-                padded = Imol
-            padded_Imol.append(padded)
-        # Padding sM
-        padded_sM = []
-        for sM in all_sM:
-            if sM.shape[1] < max_frames:
-                pad_width = ((0, 0), (0, max_frames - sM.shape[1]))
-                padded = np.pad(sM, pad_width, mode='constant', constant_values=np.nan)
-            else:
-                padded = sM
-            padded_sM.append(padded)
-
-        # ensemble average
-        logger.info('* Averaging signal over the ensemble of trajectories.')
-        Imol_stacked = np.stack(padded_Imol, axis=0)  # [n_traj, q, t]
-        mean_Imol = np.nanmean(Imol_stacked, axis=0) # [q, t]
-        mean_Imol0 = np.nanmean(Imol_stacked[:,:,0], axis=0) # [q,] - average at t=0
-        stacked_sM = np.stack(padded_sM, axis=0)  # [n_traj, q, t]
-        mean_sM = np.nanmean(stacked_sM, axis=0)   # [q, t]
-        mean_sM0 = np.nanmean(stacked_sM[:, :, 0], axis=0)  # [q] - average at t=0
-
-        logger.info('* Calculating the difference signal by subtracting reference.')
-        numerator = mean_Imol - mean_Imol0[:, None] # [:, None] casts (N,) array to (N, 1) for element-wise operations
-        denominator = Iat0[:, None] + mean_Imol0[:, None]
-        dIoverI = numerator / denominator * 100
-
-        # Now calculate PDF from the final signal
-        # Final signal: mean_s(t) - mean_s(0)
-        logger.info('* Calculating PDF from averaged signal.')
-        sm_ang = np.real(mean_sM - mean_sM0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
-        pdf_raw = np.empty((len(q_ang), sm_ang.shape[1]))
-        for t in range(sm_ang.shape[1]):
-            pdf_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha, mode=pdf_mode)
-
-        logger.info('* Convoluting singal in time with Gaussian kernel.')
-        times = np.arange(max_frames) * dt_fs
-        signal_smooth, times_smooth = self.gaussian_smooth_2d_time(dIoverI, times, fwhm_fs)
-        pdf_smooth, _ = self.gaussian_smooth_2d_time(pdf_raw, times, fwhm_fs)
-
-        return times, self.qfit, dIoverI, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth
