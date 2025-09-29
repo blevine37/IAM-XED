@@ -99,9 +99,9 @@ The function above is implemented in IAM-XED. The definition comes from:
 > 
 > or as
 >
-> $$\bar{P}(r) = 1/r \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
+> $$\bar{P}(r) = \frac{1}{r} \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
 >
-> The `--pdf-mode` flag allows choosing between `rpdf` (default, $P(r)$), `pdf` (second definition, $\tilde{P}(r)$), and `1/rpdf` (third definition, $\bar{P}(r)$).
+> The `--pdf-mode` flag allows choosing between `rpdf` (default, $P(r)$ ), `pdf` (second definition, $\tilde{P}(r)$ ), and `1/rpdf` (third definition, $\bar{P}(r)$ ).
 
 ## Quick start
 IAM-XED is called in the command line with input specified in the form of flags.
