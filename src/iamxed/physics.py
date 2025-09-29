@@ -106,22 +106,36 @@ class BaseDiffractionCalculator(ABC):
         return Z_smooth, times_extended
 
     @staticmethod
-    def FT(r: np.ndarray, s: np.ndarray, T: np.ndarray, alpha: float) -> np.ndarray:
-        """Fourier transform for rPDF calculation.
+    def FT(r: np.ndarray, s: np.ndarray, T: np.ndarray, alpha: float, mode: str = 'rpdf') -> np.ndarray:
+        """Fourier transform for PDF/rPDF calculation.
         
         Args:
+            r: Real-space grid in Angstrom
             s: Q-grid in Angstrom^-1
             T: Signal to transform
             alpha: Damping parameter in Angstrom^2
+            mode: Output mode, one of {'rpdf', 'pdf', '1/rpdf'}
             
         Returns:
-            rPDF on same grid as input
+            Transform on same grid as input, formatted per ``mode``
         """
-        logger.debug("[DEBUG]: Entering Fourier transform for rPDF calculation")
+        logger.debug("[DEBUG]: Entering Fourier transform for PDF calculation (mode=%s)", mode)
         T = np.nan_to_num(T)
         Tr = np.empty_like(T)
+        allowed_modes = {'rpdf', 'pdf', '1/rpdf'}
+        if mode not in allowed_modes:
+            logger.error(f"ERROR: Unsupported PDF mode '{mode}'. Allowed values: {allowed_modes}.")
+            raise ValueError(f"Unsupported PDF mode '{mode}'.")
+
+        damping = np.exp(-alpha * s**2)
         for pos, k in enumerate(r):
-            Tr[pos] = k * np.trapz(T * np.sin(s * k) * np.exp(-alpha * s**2), x=s)
+            integral = np.trapz(T * np.sin(s * k) * damping, x=s)
+            if mode == 'rpdf':
+                Tr[pos] = k * integral
+            elif mode == 'pdf':
+                Tr[pos] = integral
+            else:  # mode == '1/rpdf'
+                Tr[pos] = integral / k if k != 0 else 0.0
 
 
         ### THE FOLLOWING COMMENTED OUT CODE IS AND ALTERNATIVE IMPLEMENTATION USING DST ###
@@ -139,7 +153,7 @@ class BaseDiffractionCalculator(ABC):
         # Tr2 = np.interp(r, r2, Tr2)  # Interpolate back to original r grid
         # Tr2 *= r  # Scale by r
 
-        logger.debug("[DEBUG]: Finished Fourier transform for rPDF calculation")
+        logger.debug("[DEBUG]: Finished Fourier transform for PDF calculation (mode=%s)", mode)
 
         return Tr
 
@@ -269,7 +283,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         inel = calc_inel(Z, d1, d2, d3, q1, t1, t2, t3, self.qfit * ANG_TO_BH / (4 * np.pi))
         return inel
 
-    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry XRD pattern, or average over all geometries in a directory or trajectory file."""
         if os.path.isdir(geom_file): # getting first geometry from all files in directory
             xyz_files = find_xyz_files(geom_file)
@@ -299,7 +313,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
             Itot = Iat + Imol
             return self.qfit, Itot, None, None
 
-    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate difference between two geometries.
 
         pdf_alpha: Damping parameter for PDF calculation (currently unused in XRD but kept for future development).
@@ -310,16 +324,16 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
         """
         # Get signals for both inputs using calc_single
         logger.info("* Signal calculation")
-        _, I1, _, _ = self.calc_single(geom1)
+        _, I1, _, _ = self.calc_single(geom1, pdf_alpha, pdf_mode)
         logger.info("* Reference calculation")
-        _, I2, _, _ = self.calc_single(geom2)
+        _, I2, _, _ = self.calc_single(geom2, pdf_alpha, pdf_mode)
         
         # Calculate relative difference in percent
         logger.info("* Difference calculation")
         diff = (I1 - I2) / I2 * 100
         return self.qfit, diff, None, None
 
-    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate time-resolved XRD pattern from trajectory, returning both unsmoothed and smoothed signals.
         For XRD, PDFs are not calculated, so dummy arrays are returned for compatibility with UED.
         
@@ -383,7 +397,7 @@ class XRDDiffractionCalculator(BaseDiffractionCalculator):
 
         return times, self.qfit, dIoverI, times_smooth, signal_smooth, None, None, None
 
-    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate ensemble average of trajectories.
 
         Returns relative differences (I(t)-I(0))/I(0) * 100 as percentage.
@@ -507,7 +521,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             Iat += np.real(ff * np.conjugate(ff))  # Multiply by conjugate to get real intensity
         return Iat
 
-    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_single(self, geom_file: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate single geometry UED pattern and PDF, or average over all geometries in a directory or trajectory file."""
         import os
         from .io_utils import is_trajectory_file, read_xyz_trajectory, find_xyz_files
@@ -521,7 +535,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
             q_ang = self.qfit / BH_TO_ANG
             sm_ang = sm / BH_TO_ANG
             r = q_ang.copy()
-            pdf = self.FT(r, q_ang, sm_ang, pdf_alpha)
+            pdf = self.FT(r, q_ang, sm_ang, pdf_alpha, mode=pdf_mode)
             return I, sm, r, pdf
 
         if os.path.isdir(geom_file):
@@ -553,7 +567,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
             return self.qfit, I, r, pdf
 
-    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def calc_difference(self, geom1: str, geom2: str, pdf_alpha: float = 0.04, pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         """Calculate difference between two geometries and its PDF.
 
         Atom order does not need to match, only the sets of elements must be the same.
@@ -562,9 +576,9 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
         # Get signals and PDFs for both inputs using calc_single
         logger.info("* Signal calculation")
 
-        _, I1, r1, pdf1 = self.calc_single(geom1, pdf_alpha)
+        _, I1, r1, pdf1 = self.calc_single(geom1, pdf_alpha, pdf_mode)
         logger.info("* Reference calculation")
-        _, I2, r2, pdf2 = self.calc_single(geom2, pdf_alpha)
+        _, I2, r2, pdf2 = self.calc_single(geom2, pdf_alpha, pdf_mode)
 
         logger.info("* Difference calculation")
         dIoverI = (I1 - I2) / I2 * 100  # dI/I
@@ -572,7 +586,9 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
         return self.qfit, dIoverI, r1, pdf_diff
 
-    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def calc_trajectory(self, trajfile: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0,
+                        pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None,
+                        pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate time-resolved UED pattern from trajectory, returning both unsmoothed and smoothed signals and their PDFs.
 
         Args:
@@ -632,7 +648,7 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
             # Calculate PDF for this frame using provided alpha
             sM_ang = dsM / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
-            pdf = self.FT(r, q_ang, sM_ang, pdf_alpha)
+            pdf = self.FT(r, q_ang, sM_ang, pdf_alpha, mode=pdf_mode)
             pdfs.append(pdf)
 
         signal_raw = np.array(signals).T
@@ -648,7 +664,9 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
         return times, self.qfit, signal_raw, times_smooth, signal_smooth, r, pdf_raw, pdf_smooth
 
-    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0, pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def calc_ensemble(self, xyz_dir: str, timestep_au: float = 10.0, fwhm_fs: float = 150.0,
+                      pdf_alpha: float = 0.04, tmax_fs: Optional[float] = None,
+                      pdf_mode: str = 'rpdf') -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate ensemble-averaged signal and PDF from a directory of trajectories, matching the interface of calc_trajectory.
         For each time point, average over all available trajectories.
 
@@ -739,11 +757,11 @@ class UEDDiffractionCalculator(BaseDiffractionCalculator):
 
         # Now calculate PDF from the final signal
         # Final signal: mean_s(t) - mean_s(0)
-        logger.info('* Calculating rPDF from averaged signal.')
+        logger.info('* Calculating PDF from averaged signal.')
         sm_ang = np.real(mean_sM - mean_sM0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
         pdf_raw = np.empty((len(q_ang), sm_ang.shape[1]))
         for t in range(sm_ang.shape[1]):
-            pdf_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha)
+            pdf_raw[:, t] = self.FT(r, q_ang, sm_ang[:, t], pdf_alpha, mode=pdf_mode)
 
         logger.info('* Convoluting singal in time with Gaussian kernel.')
         times = np.arange(max_frames) * dt_fs

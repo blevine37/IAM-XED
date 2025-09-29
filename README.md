@@ -97,7 +97,11 @@ The function above is implemented in IAM-XED. The definition comes from:
 > 
 > $$\tilde{P}(r) = \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
 > 
-> which is NOT used in IAM-XED but can be achieved by dividing our PDF by $r$. To distinguish the two definitions, we use the term 'rPDF' in IAM-XED to emphasize the multiplication by $r$ in our definition of PDF.
+> or as
+>
+> $$\bar{P}(r) = 1/r \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
+>
+> The `--pdf-mode` flag allows choosing between `rpdf` (default, $P(r)$), `pdf` (second definition, $\tilde{P}(r)$), and `1/rpdf` (third definition, $\bar{P}(r)$).
 
 ## Quick start
 IAM-XED is called in the command line with input specified in the form of flags.
@@ -127,7 +131,7 @@ Both modes are compatible with UED and XRD (possibly with inelastic Compton scat
 
 ### Static Calculations
 
-Static calculations compute the average signal over all provided geometries. This is useful for obtaining a single diffraction pattern or rPDF from a static structure or an ensemble of structures.
+Static calculations compute the average signal over all provided geometries. This is useful for obtaining a single diffraction pattern or PDF from a static structure or an ensemble of structures.
 If reference geometries are provided, the difference signal is calculated as a relative change from the reference signal.
 
 ### Time-resolved Calculations
@@ -175,6 +179,7 @@ Reference geometries are used for calculating the difference signal in static ca
 | `--tmax`                | Maximum time considered (fs).                                                   | None (up to the longest trajectory)     |
 | `--fwhm`                | FWHM parameter for Gaussian temporal convolution (fs).                          | 150.0                                   |
 | `--pdf-alpha`           | PDF damping parameter (Å²).                                                     | 0.04                                    |
+| `--pdf-mode`            | Output mode for PDF transform in UED calculations: `rpdf`, `pdf`, or `1/rpdf`. | `rpdf`                                  |
 | `--qmin`, `--qmax`      | Momentum transfer range $q$ (or $s$) (Bohr⁻¹).                              | 0.0, 5.292                              |
 | `--npoints`             | Number of $q$-points.                                                         | 200                                     |
 | `--log-to-file-disable` | Disable logging output to a file along with the console.                        | False                                   |
@@ -230,7 +235,7 @@ Momentum coordinate in plots and export is labelled $s$ for UED.
 ```bash
 iamxed --ued --signal-geoms molecule.xyz
 ```
-Calculates the real-space pair distribution function (rPDF) $P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$. 
+Calculates the real-space pair distribution function. The default rPDF format is $P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$. Use `--pdf-mode` to select different output formats. 
 
 
 **Difference Signal from Single Trajectory:**
