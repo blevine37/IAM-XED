@@ -85,6 +85,7 @@ where $sM(s)$ represents the modified scattering intensity
 
 $$sM(s) = s\frac{I_\mathrm{mol}(s)}{I_\mathrm{at}(s)}.$$
 
+As such, $P(r)$ describes the probability of atom pairs. 
 For practical calculations, the integral is limited to a finite range $[s_{min}, s_{max}]$ and damped by a Gaussian smearing factor $\mathrm{e}^{-\alpha s^2}$, leading to the final expression
 
 $$P(r) = r \int_{s_{min}}^{s_{max}} s M(s) \sin(s r) \mathrm{e}^{-\alpha s^2} \mathrm{d}s .$$
@@ -95,13 +96,13 @@ The function above is implemented in IAM-XED for both UED and XRD calculations. 
 > [!WARNING]
 > Some sources define PDF as
 > 
-> $$\tilde{P}(r) = \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
+> $$\tilde{P}(r) = \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s \, ,$$
 > 
-> or as
+> which is mathematically more convenient to compute, or as
 >
-> $$\bar{P}(r) = \frac{1}{r} \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s$$
+> $$\bar{P}(r) = \frac{1}{r} \int_{0}^{\infty} s M(s) \sin(s r) \mathrm{d}s \, ,$$
 >
-> The `--pdf-mode` flag allows choosing between `rpdf` (default, $P(r)$ ), `pdf` (second definition, $\tilde{P}(r)$ ), and `1/rpdf` (third definition, $\bar{P}(r)$ ).
+> which describes the probability density corresponding to the atom pairs. The `--pdf-mode` flag allows choosing between `rpdf` (default, $P(r)$ ), `pdf` (second definition, $\tilde{P}(r)$ ), and `1/rpdf` (third definition, $\bar{P}(r)$ ).
 
 ## Quick start
 IAM-XED is called in the command line with input specified in the form of flags.
