@@ -221,16 +221,13 @@ def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.nd
     else:
         metadata += ["#Units: times: fs, q: Bohr⁻¹, signals: dI/I (%)"]
     metadata = np.array(metadata, dtype='U')
-    if args.ued:  # Include PDFs for UED only
+    if args.ued:
         np.savez(args.export, times=times, times_smooth=times_smooth, s=q, signal_raw=signal_raw,
             signal_smooth=signal_smooth, r=r, pdf_raw=pdf_raw, pdf_smooth=pdf_smooth, metadata=metadata)
-        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdf_raw, pdf_smooth)), comments=header, header='# q    PDF    convoluted PDF')
-        # logger.info(f"Exporting time-resolved PDF to '{args.export}.npz'.")
         # todo: export readable files in txt
     else:
         np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw,
-            signal_smooth=signal_smooth, metadata=metadata)
-        # todo: export readable files in txt
+            signal_smooth=signal_smooth, r=r, pdf_raw=pdf_raw, pdf_smooth=pdf_smooth, metadata=metadata)
     logger.info(f"Exporting all time-resolved data in binary format to '{args.export}.npz'.")
 
 def parse_cmd_args() -> argparse.Namespace:
