@@ -7,6 +7,8 @@ from typing import Optional
 from matplotlib.colors import TwoSlopeNorm
 from logging import getLogger
 
+from .io_utils import pdf_mode_to_label
+
 logger = getLogger("my_logger") # getting logger
 
 def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, pdf_mode: str, is_difference: bool = False, plot_units: str = 'bohr-1', r: Optional[np.ndarray] = None, pdf: Optional[np.ndarray] = None, plot_flip: bool = False) -> None:
@@ -21,8 +23,6 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, pdf_mode: str, 
         pdf: PDF values (optional)
         plot_flip: Whether to flip x and y axes
     """
-
-    pdf_present = (r is not None) and (pdf is not None)
 
     # Convert units for momentum transfer coordinate if needed
     if plot_units == 'angstrom-1':
@@ -43,21 +43,18 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, pdf_mode: str, 
     # get qmin and qmax from converted coordinates
     qmin, qmax = np.min(q_plot), np.max(q_plot)
 
-    # get rmin and rmax if rPDF is present
-    if pdf_present:
-        rmin, rmax = np.min(r), np.max(r)
+    # get rmin and rmax for PDF
+    rmin, rmax = np.min(r), np.max(r)
 
     ### labels and titles
     # pdf
-    if pdf_present:
-        from .io_utils import pdf_mode_to_label
-        pdf_label = pdf_mode_to_label(pdf_mode)
-        if is_difference:
-            title_pdf = f'Difference Pair Distribution Function ($\Delta${pdf_label})'
-            label_pdf = f'$\Delta${pdf_label} (arb. units)'
-        else:
-            title_pdf = f'Pair Distribution Function ({pdf_label})'
-            label_pdf = f'{pdf_label} (arb. units)'
+    pdf_label = pdf_mode_to_label(pdf_mode)
+    if is_difference:
+        title_pdf = f'Difference Pair Distribution Function ($\Delta${pdf_label})'
+        label_pdf = f'$\Delta${pdf_label} (arb. units)'
+    else:
+        title_pdf = f'Pair Distribution Function ({pdf_label})'
+        label_pdf = f'{pdf_label} (arb. units)'
 
     #  intensity
     if is_xrd:
@@ -75,14 +72,10 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, pdf_mode: str, 
             label_i = '$I(s)$ (arb. units)'
             title_i = 'UED Signal Intensity'
 
-    # initialize plot depending on rPDF presence
-    if pdf_present:
-        fig, axs = plt.subplots(1,2, figsize=(5*2, 5), gridspec_kw={'width_ratios': [1, 1]})
-        ax_I = axs[0]
-        ax_pdf = axs[1]
-    else:
-        fig, axs = plt.subplots(1,1, figsize=(5, 5))
-        ax_I = axs
+    # initialize plot
+    fig, axs = plt.subplots(1,2, figsize=(5*2, 5), gridspec_kw={'width_ratios': [1, 1]})
+    ax_I = axs[0]
+    ax_pdf = axs[1]
 
     if plot_flip:
         ax_I.plot(signal_plot, q_plot, linewidth=1.5)
@@ -104,29 +97,28 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, pdf_mode: str, 
     ax_I.set_title(title_i)
     ax_I.grid(True, alpha=0.3)
 
-    # Plot rPDF if provided
-    if pdf_present:
-        # Then handle plot orientation
-        if plot_flip:
-            ax_pdf.plot(pdf, r, linewidth=1.5)
-            # ax_pdf.fill_betweenx(r, pdf, alpha=0.1, linewidth=1.5)
-            ax_pdf.axvline(0, color='k', linewidth=1)
-            ax_pdf.set_ylabel('$r$ (Å)')
-            ax_pdf.set_xlabel(label_pdf)
-            ax_pdf.set_ylim(rmin, rmax)
-            if is_difference: ax_pdf.set_xlim(-1.1*np.max(np.abs(pdf)), 1.1*np.max(np.abs(pdf)))
+    # Plot
+    # Handle plot orientation
+    if plot_flip:
+        ax_pdf.plot(pdf, r, linewidth=1.5)
+        # ax_pdf.fill_betweenx(r, pdf, alpha=0.1, linewidth=1.5)
+        ax_pdf.axvline(0, color='k', linewidth=1)
+        ax_pdf.set_ylabel('$r$ (Å)')
+        ax_pdf.set_xlabel(label_pdf)
+        ax_pdf.set_ylim(rmin, rmax)
+        if is_difference: ax_pdf.set_xlim(-1.1*np.max(np.abs(pdf)), 1.1*np.max(np.abs(pdf)))
 
-        else:
-            ax_pdf.plot(r, pdf, linewidth=1.5)
-            # ax_pdf.fill_between(r, pdf, pdf*0, alpha=0.1, linewidth=1.5)
-            ax_pdf.axhline(0, color='k', linewidth=1)
-            ax_pdf.set_xlabel('$r$ (Å)')
-            ax_pdf.set_ylabel(label_pdf)
-            ax_pdf.set_xlim(rmin, rmax)
-            if is_difference: ax_pdf.set_ylim(-1.1*np.max(np.abs(pdf)), 1.1*np.max(np.abs(pdf)))
+    else:
+        ax_pdf.plot(r, pdf, linewidth=1.5)
+        # ax_pdf.fill_between(r, pdf, pdf*0, alpha=0.1, linewidth=1.5)
+        ax_pdf.axhline(0, color='k', linewidth=1)
+        ax_pdf.set_xlabel('$r$ (Å)')
+        ax_pdf.set_ylabel(label_pdf)
+        ax_pdf.set_xlim(rmin, rmax)
+        if is_difference: ax_pdf.set_ylim(-1.1*np.max(np.abs(pdf)), 1.1*np.max(np.abs(pdf)))
 
-        ax_pdf.set_title(title_pdf)
-        ax_pdf.grid(True, alpha=0.3)
+    ax_pdf.set_title(title_pdf)
+    ax_pdf.grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.get_current_fig_manager().set_window_title(title_i)
@@ -156,8 +148,6 @@ def plot_time_resolved(times: np.ndarray, times_smooth: np.ndarray, q: np.ndarra
         plot_flip: Whether to flip x and y axes
     """
 
-    pdf_present = (r is not None) and (pdf is not None)
-
     if plot_units == 'angstrom-1':
         q_plot = q * 1.88973
         if is_xrd:
@@ -176,16 +166,11 @@ def plot_time_resolved(times: np.ndarray, times_smooth: np.ndarray, q: np.ndarra
     t_min, t_max = times.min(), times.max()
 
     # setting up plot
-    if pdf_present:
-        fig, axs = plt.subplots(2, 2, figsize=(9, 8))
-        ax_i = axs[0, 0]
-        ax_i_smooth = axs[1, 0]
-        ax_pdf = axs[0, 1]
-        ax_pdf_smooth = axs[1, 1]
-    else:
-        fig, axs = plt.subplots(1, 2, figsize=(11, 5))
-        ax_i = axs[0]
-        ax_i_smooth = axs[1]
+    fig, axs = plt.subplots(2, 2, figsize=(9, 8))
+    ax_i = axs[0, 0]
+    ax_i_smooth = axs[1, 0]
+    ax_pdf = axs[0, 1]
+    ax_pdf_smooth = axs[1, 1]
 
     ### plot raw dI/I data ###
     signal_plot = signal
@@ -229,51 +214,49 @@ def plot_time_resolved(times: np.ndarray, times_smooth: np.ndarray, q: np.ndarra
     plt.colorbar(im, label=f'$\Delta I/I_0$ (%)')
     ax_i_smooth.set_title(title_i)
 
-    ### plot rPDF if provided ###
-    if pdf_present:
-        from .io_utils import pdf_mode_to_label
-        pdf_label = pdf_mode_to_label(pdf_mode)
-        ### raw rPDF ###
-        signal_plot = pdf
-        vlim = np.nanmax(np.abs(signal_plot))
-        divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
-        title_pdf = f'Time-Resolved {"XRD" if is_xrd else "UED"} $\Delta${pdf_label}'
+    ### plot PDF ###
+    pdf_label = pdf_mode_to_label(pdf_mode)
+    ### raw rPDF ###
+    signal_plot = pdf
+    vlim = np.nanmax(np.abs(signal_plot))
+    divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
+    title_pdf = f'Time-Resolved {"XRD" if is_xrd else "UED"} $\Delta${pdf_label}'
 
-        if plot_flip:
-            # Transpose data, swap axes: x=time, y=q
-            extent = (t_min, t_max, r.min(), r.max())
-            im = ax_pdf.imshow(signal_plot, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
-            ax_pdf.set_xlabel('Time (fs)')
-            ax_pdf.set_ylabel('$r$ (Å)')
-        else:
-            extent = (r.min(), r.max(), t_min, t_max)
-            im = ax_pdf.imshow(signal_plot.T, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
-            ax_pdf.set_xlabel('$r$ (Å)')
-            ax_pdf.set_ylabel('Time (fs)')
-        plt.colorbar(im, label=f'$\Delta${pdf_label} (arb. units)') 
-        ax_pdf.set_title(title_pdf)
+    if plot_flip:
+        # Transpose data, swap axes: x=time, y=q
+        extent = (t_min, t_max, r.min(), r.max())
+        im = ax_pdf.imshow(signal_plot, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
+        ax_pdf.set_xlabel('Time (fs)')
+        ax_pdf.set_ylabel('$r$ (Å)')
+    else:
+        extent = (r.min(), r.max(), t_min, t_max)
+        im = ax_pdf.imshow(signal_plot.T, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
+        ax_pdf.set_xlabel('$r$ (Å)')
+        ax_pdf.set_ylabel('Time (fs)')
+    plt.colorbar(im, label=f'$\Delta${pdf_label} (arb. units)') 
+    ax_pdf.set_title(title_pdf)
 
-        ### convoluted rPDF ###
-        signal_plot = pdf_smooth
-        vlim = np.nanmax(np.abs(signal_plot))
-        divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
-        title_pdf = f'Convoluted TR-{"XRD" if is_xrd else "UED"} $\Delta${pdf_label}'
+    ### convoluted rPDF ###
+    signal_plot = pdf_smooth
+    vlim = np.nanmax(np.abs(signal_plot))
+    divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
+    title_pdf = f'Convoluted TR-{"XRD" if is_xrd else "UED"} $\Delta${pdf_label}'
 
-        if plot_flip:
-            # Transpose data, swap axes: x=time, y=q
-            extent = (t_min_smooth, t_max_smooth, r.min(), r.max())
-            im = ax_pdf_smooth.imshow(signal_plot, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
-            ax_pdf_smooth.set_xlabel('Time (fs)')
-            ax_pdf_smooth.set_ylabel('$r$ (Å)')
-            ax_pdf_smooth.axvline(0, color='grey', linestyle='-', lw=0.5)
-        else:
-            extent = (r.min(), r.max(), t_min_smooth, t_max_smooth)
-            im = ax_pdf_smooth.imshow(signal_plot.T, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
-            ax_pdf_smooth.set_xlabel('$r$ (Å)')
-            ax_pdf_smooth.set_ylabel('Time (fs)')
-            ax_pdf_smooth.axhline(0, color='grey', linestyle='-', lw=0.5)
-        plt.colorbar(im, label=f'$\Delta${pdf_label} (arb. units)')
-        ax_pdf_smooth.set_title(title_pdf)
+    if plot_flip:
+        # Transpose data, swap axes: x=time, y=q
+        extent = (t_min_smooth, t_max_smooth, r.min(), r.max())
+        im = ax_pdf_smooth.imshow(signal_plot, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
+        ax_pdf_smooth.set_xlabel('Time (fs)')
+        ax_pdf_smooth.set_ylabel('$r$ (Å)')
+        ax_pdf_smooth.axvline(0, color='grey', linestyle='-', lw=0.5)
+    else:
+        extent = (r.min(), r.max(), t_min_smooth, t_max_smooth)
+        im = ax_pdf_smooth.imshow(signal_plot.T, extent=extent, aspect='auto', origin='lower', cmap='RdBu_r', norm=divnorm)
+        ax_pdf_smooth.set_xlabel('$r$ (Å)')
+        ax_pdf_smooth.set_ylabel('Time (fs)')
+        ax_pdf_smooth.axhline(0, color='grey', linestyle='-', lw=0.5)
+    plt.colorbar(im, label=f'$\Delta${pdf_label} (arb. units)')
+    ax_pdf_smooth.set_title(title_pdf)
 
     plt.tight_layout()
     plot_title = 'Time-Resolved ' + ('XRD' if is_xrd else 'UED') + ' Signal'

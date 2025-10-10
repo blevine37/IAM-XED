@@ -112,7 +112,7 @@ class BaseDiffractionCalculator(ABC):
 
     @staticmethod
     def FT(r: np.ndarray, s: np.ndarray, T: np.ndarray, alpha: float, mode: str = 'rpdf') -> np.ndarray:
-        """Fourier transform for PDF/rPDF calculation.
+        """Fourier transform for PDF calculation.
         
         Args:
             r: Real-space grid in Angstrom

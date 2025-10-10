@@ -236,7 +236,7 @@ Momentum coordinate in plots and export is labelled $s$ for UED.
 ```bash
 iamxed --ued --signal-geoms molecule.xyz
 ```
-Calculates the real-space pair distribution function. The default rPDF format is $P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$. Use `--pdf-mode` to select different output formats. 
+Calculates the real-space pair distribution function. The default PDF format is $P(r) =  r  \int_{s_{min}}^{s_{max}} sM(s) \sin(s r) \exp(-\alpha s^2) \mathrm{d}s$. Use `--pdf-mode` to select different output formats.
 
 
 **Difference Signal from Single Trajectory:**
