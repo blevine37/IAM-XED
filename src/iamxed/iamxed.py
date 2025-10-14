@@ -81,7 +81,9 @@ def iamxed(args: Namespace):
                 output += ' will be performed.'
         logger.info(output)
 
-        #todo: this must be polished
+        if args.ued and args.inelastic:
+            logger.warning("WARNING: Inelastic scattering cannot be calculated for UED. Ignoring --inelastic flag.")
+            args.inelastic = False
 
         # print how signal and reference geometries will be read and treated
         if signal_geom_type == 'file':
@@ -111,7 +113,7 @@ def iamxed(args: Namespace):
                     find_xyz_files(args.reference_geoms)))
         else:
             if args.signal_type == 'time-resolved':
-                logger.info('No reference provided for time-resolved calculation -> first geometries all trajectories will be used as reference.')
+                logger.info('No reference provided for time-resolved calculation -> first geometries of all trajectories will be used as reference.')
             else:
                 logger.info('No reference provided, only signal calculation will be performed.')
 
@@ -127,7 +129,7 @@ def iamxed(args: Namespace):
     # Determine geometry types
     signal_geom_type = 'file' if os.path.isfile(args.signal_geoms) else 'directory'
     if args.reference_geoms is not None:
-        ref_geom_type = 'file' if os.path.isfile(args.reference_geoms) else 'directory' # todo: check if this is correct, maybe it should be 'directory' if a directory is provided
+        ref_geom_type = 'file' if os.path.isfile(args.reference_geoms) else 'directory'
 
     # Print header and input parameters
     print_input_parameters(args)
@@ -217,15 +219,15 @@ def iamxed(args: Namespace):
                 if args.signal_type == 'static':
                     logger.info('Plotting static difference signal...')
                     plot_static(q, diff_signal, args.xrd, args.pdf_mode, is_difference=True, plot_units=args.plot_units, r=r,
-                        pdf=diff_pdf, plot_flip=args.plot_flip)
+                        pdf=diff_pdf, plot_flip=args.plot_flip, inelastic=args.inelastic)
             else:
                 if args.signal_type == 'static':
                     logger.info('Plotting static signal.')
-                    plot_static(q, signal, args.xrd, args.pdf_mode, plot_units=args.plot_units, r=r, pdf=pdf, plot_flip=args.plot_flip)
+                    plot_static(q, signal, args.xrd, args.pdf_mode, plot_units=args.plot_units, r=r, pdf=pdf, plot_flip=args.plot_flip, inelastic=args.inelastic)
                 elif args.signal_type == 'time-resolved':
                     logger.info('Plotting time-resolved signal.')
                     plot_time_resolved(times, times_smooth, q, signal_raw, signal_smooth, r, pdf_raw, pdf_smooth,
-                        args.xrd, args.pdf_mode, plot_units=args.plot_units, fwhm_fs=args.fwhm, plot_flip=args.plot_flip)
+                        args.xrd, args.pdf_mode, plot_units=args.plot_units, fwhm_fs=args.fwhm, plot_flip=args.plot_flip, inelastic=args.inelastic)
         except Exception as e:
             logger.error(f"ERROR: Plotting issued exception: {str(e)}")
             return 1

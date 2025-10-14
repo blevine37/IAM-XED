@@ -18,6 +18,7 @@ from .io_utils import read_xyz, read_xyz_trajectory, find_xyz_files, is_trajecto
 from .XSF.xsf_data_elastic import XSF_DATA
 from .ESF.esf_data import ESF_DATA
 from logging import getLogger
+from .io_utils import pdf_mode_to_label
 
 logger = getLogger("my_logger") # getting logger
 
@@ -409,7 +410,7 @@ class BaseDiffractionCalculator(ABC):
 
         # Now calculate PDF from the final signal
         # Final signal: mean_s(t) - mean_s(0)
-        logger.info('* Calculating PDF from averaged signal.')
+        logger.info(f'* Calculating {pdf_mode_to_label(pdf_mode)} from averaged signal.')
         sm_ang = (mean_sM - mean_sM0[:, None]) / BH_TO_ANG  # Convert to Angstrom^-1 for PDF calculation
         pdf_raw = np.empty((len(q_ang), sm_ang.shape[1]))
         for t in range(sm_ang.shape[1]):
