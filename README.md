@@ -341,10 +341,14 @@ If you use IAM-XED in your research, please cite:
 
 ```bibtex
 @software{iam_xed,
-  title = {IAM-XED: Independent Atom Model for X-ray and Electron Diffraction},
-  author = {Suchan, Jiří and Janoš, Jiří},
-  url = {https://github.com/blevine37/IAM-XED},
-  year = {2025}
+  author       = {Suchan, Jiří and Janoš, Jiří},
+  title        = {IAM-XED: Independent Atom Model for X-ray and Electron Diffraction},
+  month        = oct,
+  year         = 2025,
+  publisher    = {Zenodo},
+  version      = {v1.1.0},
+  doi          = {10.5281/zenodo.17350829},
+  url          = {https://doi.org/10.5281/zenodo.17350829},
 }
 ```
 
