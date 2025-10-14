@@ -1,5 +1,6 @@
 [![Version](https://img.shields.io/badge/Version-1.1.0-blue)](https://github.com/blevine37/IAM-XED/releases)
 [![PyPI version](https://img.shields.io/pypi/v/iamxed)](https://pypi.org/project/iamxed/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17350828.svg)](https://doi.org/10.5281/zenodo.17350828)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](/LICENSE)
 [![CI tests](https://github.com/blevine37/IAM-XED/actions/workflows/ci.yml/badge.svg)](https://github.com/blevine37/IAM-XED/actions/workflows/ci.yml)
 
@@ -340,10 +341,14 @@ If you use IAM-XED in your research, please cite:
 
 ```bibtex
 @software{iam_xed,
-  title = {IAM-XED: Independent Atom Model for X-ray and Electron Diffraction},
-  author = {Suchan, Jiří and Janoš, Jiří},
-  url = {https://github.com/blevine37/IAM-XED},
-  year = {2025}
+  author       = {Suchan, Jiří and Janoš, Jiří},
+  title        = {IAM-XED: Independent Atom Model for X-ray and Electron Diffraction},
+  month        = oct,
+  year         = 2025,
+  publisher    = {Zenodo},
+  version      = {v1.1.0},
+  doi          = {10.5281/zenodo.17350829},
+  url          = {https://doi.org/10.5281/zenodo.17350829},
 }
 ```
 
