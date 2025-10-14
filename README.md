@@ -314,6 +314,7 @@ params = {
     "timestep": 20.0,
     "fwhm": 120.0,
     "pdf_alpha": 0.04,
+    "pdf_mode": "rpdf",
     "tmax": False,
     "export": "ued_ensemble",
     "log_to_file_disable": False,
