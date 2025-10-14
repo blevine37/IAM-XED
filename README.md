@@ -1,5 +1,6 @@
 [![Version](https://img.shields.io/badge/Version-1.1.0-blue)](https://github.com/blevine37/IAM-XED/releases)
 [![PyPI version](https://img.shields.io/pypi/v/iamxed)](https://pypi.org/project/iamxed/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17350828.svg)](https://doi.org/10.5281/zenodo.17350828)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](/LICENSE)
 [![CI tests](https://github.com/blevine37/IAM-XED/actions/workflows/ci.yml/badge.svg)](https://github.com/blevine37/IAM-XED/actions/workflows/ci.yml)
 
