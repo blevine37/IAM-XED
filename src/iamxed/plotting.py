@@ -52,12 +52,12 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, pdf_mode: str, 
     if is_difference:
         title_pdf = fr'Difference Pair Distribution Function ($\Delta${pdf_label})'
         label_pdf = fr'$\Delta${pdf_label} (arb. units)'
-        title_i = f'{"inel. " if inelastic else ""}{"XRD" if is_xrd else "UED"} Relative Difference Signal'
+        title_i = f'{"XRD" if is_xrd else "UED"} Relative Difference Signal{" (inel.)" if inelastic else ""}'
         label_i = r'$\Delta I/I_0$ (%)'
     else:
         title_pdf = f'Pair Distribution Function ({pdf_label})'
         label_pdf = f'{pdf_label} (arb. units)'
-        title_i = f'{"inel. " if inelastic else ""}{"XRD" if is_xrd else "UED"} Signal Intensity'
+        title_i = f'{"XRD" if is_xrd else "UED"} Signal Intensity{" (inel.)" if inelastic else ""}'
         label_i = fr'{'$I(q)$' if is_xrd else '$I(s)$'} (arb. units)'
 
     # initialize plot
@@ -164,7 +164,7 @@ def plot_time_resolved(times: np.ndarray, times_smooth: np.ndarray, q: np.ndarra
     signal_plot = signal
     vlim = np.nanmax(np.abs(signal_plot))
     divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
-    title_i = f'Time-Resolved {"inel. " if inelastic else ""}{"XRD" if is_xrd else "UED"} Signal'
+    title_i = f'Time-Resolved {"XRD" if is_xrd else "UED"} Signal{" (inel.)" if inelastic else ""}'
 
     if plot_flip:
         # Transpose data, swap axes: x=time, y=q
@@ -184,7 +184,7 @@ def plot_time_resolved(times: np.ndarray, times_smooth: np.ndarray, q: np.ndarra
     signal_plot = signal_smooth
     vlim = np.nanmax(np.abs(signal_plot))
     divnorm = TwoSlopeNorm(vmin=-vlim, vcenter=0., vmax=vlim)
-    title_i = f'Convoluted {"inel. " if inelastic else ""}TR-{"XRD" if is_xrd else "UED"} Signal\n(FWHM={fwhm_fs} fs)'
+    title_i = f'Convoluted TR-{"XRD" if is_xrd else "UED"} Signal{" (inel.)" if inelastic else ""}\n(FWHM={fwhm_fs} fs)'
 
     if plot_flip:
         # Transpose data, swap axes: x=time, y=q
