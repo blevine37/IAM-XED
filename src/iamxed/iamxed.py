@@ -34,6 +34,7 @@ def iamxed(args: Namespace):
                     '\n  ###   IAM-XED   ###' \
                     '\n  ###################\n')
         logger.info("Independent Atom Model code for X-ray and ultrafast Electron Diffraction.\n"
+                    "Version 1.1.0\n"
                     "Copyright (c) 2025 Suchan J., Janos J.\n")
 
         logger.info('INPUT PARAMETERS\n----------------')
