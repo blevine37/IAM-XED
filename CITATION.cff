@@ -1,8 +1,8 @@
 cff-version: 1.1.0
 message: "If you use this software, please cite it as below."
 authors:
-  - family-names: Jiří
-    given-names: Suchan
+  - family-names: Suchan
+    given-names: Jiří
   - family-names: Janoš
     given-names: Jiří
     orcid: https://orcid.org/0000-0001-5903-8538

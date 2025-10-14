@@ -139,6 +139,16 @@ def is_trajectory_file(filename: str) -> bool:
         return False
 
 
+def pdf_mode_to_label(pdf_mode: str) -> str:
+    """Convert PDF mode to display label."""
+    mapping = {
+        'rpdf': 'rPDF',
+        'pdf': 'PDF', 
+        '1/rpdf': '1/rPDF'
+    }
+    return mapping[pdf_mode]
+
+
 def get_elements_from_input(signal_geoms: str) -> List[str]:
     """Get unique elements from input geometries.
     
@@ -169,7 +179,7 @@ def get_elements_from_input(signal_geoms: str) -> List[str]:
     return sorted(elements)
 
 
-def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, signal: np.ndarray, r: Optional[np.ndarray] = None, pdfs: Optional[np.ndarray] = None, diff: bool = False, is_ued: bool = False):
+def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, signal: np.ndarray, r: Optional[np.ndarray] = None, pdfs: Optional[np.ndarray] = None, diff: bool = False, is_ued: bool = False, pdf_mode: str = 'rpdf'):
     """Export static data to a file in a npz format suitable for further analysis."""
     cmd_options = ' '.join(flags_list)
     comment = f"iamxed {cmd_options}\n"
@@ -189,35 +199,35 @@ def export_static_data(filename: str, flags_list: List[str], q: np.ndarray, sign
     np.savetxt(filename+'.txt', np.column_stack((q, signal)), header=comment+header)
     logger.info(f"Exporting static data to '{filename}.txt'.")
     if r is not None and pdfs is not None:
+        pdf_label = pdf_mode_to_label(pdf_mode)
         if diff:
-            pdf_header = '\tr (Å)\t\t\tΔrPDF (arb. units)'
+            pdf_header = f'\tr (Å)\t\t\tΔ{pdf_label} (arb. units)'
         else:
-            pdf_header = '\tr (Å)\t\t\trPDF (arb. units)'
-        np.savetxt(filename + '_rPDF.txt', np.column_stack((r, pdfs)), header=comment+pdf_header)
-        logger.info(f"Exporting PDF data to '{filename}_rPDF.txt'.")
+            pdf_header = f'\tr (Å)\t\t\t{pdf_label} (arb. units)'
+        pdf_filename = filename + f'_{pdf_label.replace("/", "_")}.txt'
+        np.savetxt(pdf_filename, np.column_stack((r, pdfs)), header=comment+pdf_header)
+        logger.info(f"Exporting PDF data to '{pdf_filename}'.")
 
 
 def export_tr_data(args: argparse.Namespace, flags_list: List[str], times: np.ndarray, times_smooth: np.ndarray, q: np.ndarray,
                    signal_raw: np.ndarray, signal_smooth: np.ndarray, r: Optional[np.ndarray] = None, pdf_raw: Optional[np.ndarray] = None,
-                   pdf_smooth: Optional[np.ndarray] = None):
+                   pdf_smooth: Optional[np.ndarray] = None, pdf_mode: str = 'rpdf'):
     """Export time-resoloved data to a file in a npz format suitable for further analysis. UED exports PDFs as well."""
     cmd_options = ' '.join(flags_list)
     metadata = [f"#Command: iamxed {cmd_options}"]
     if args.ued:
-        metadata += ["#Units: times: fs, s: Bohr⁻¹, signals: dI/I (%), r: Å, pdfs: ΔrPDF(r) (arb. units)"]
+        pdf_label = pdf_mode_to_label(pdf_mode)
+        metadata += [f"#Units: times: fs, s: Bohr⁻¹, signals: dI/I (%), r: Å, pdfs: Δ{pdf_label}(r) (arb. units)"]
     else:
         metadata += ["#Units: times: fs, q: Bohr⁻¹, signals: dI/I (%)"]
     metadata = np.array(metadata, dtype='U')
-    if args.ued:  # Include PDFs for UED only
+    if args.ued:
         np.savez(args.export, times=times, times_smooth=times_smooth, s=q, signal_raw=signal_raw,
             signal_smooth=signal_smooth, r=r, pdf_raw=pdf_raw, pdf_smooth=pdf_smooth, metadata=metadata)
-        # np.savetxt(args.export + '_UED_PDF.txt', np.column_stack((r, pdf_raw, pdf_smooth)), comments=header, header='# q    PDF    convoluted PDF')
-        # logger.info(f"Exporting time-resolved PDF to '{args.export}.npz'.")
         # todo: export readable files in txt
     else:
         np.savez(args.export, times=times, times_smooth=times_smooth, q=q, signal_raw=signal_raw,
-            signal_smooth=signal_smooth, metadata=metadata)
-        # todo: export readable files in txt
+            signal_smooth=signal_smooth, r=r, pdf_raw=pdf_raw, pdf_smooth=pdf_smooth, metadata=metadata)
     logger.info(f"Exporting all time-resolved data in binary format to '{args.export}.npz'.")
 
 def parse_cmd_args() -> argparse.Namespace:
@@ -316,6 +326,8 @@ def parse_cmd_args() -> argparse.Namespace:
                          help='Full Width at Half Maximum for temporal Gaussian smoothing of time-resolved signal. (fs)')
     proc_sec.add_argument('--pdf-alpha', type=positive_float, default=0.04,
                          help='Gaussian damping parameter for PDF Fourier transform (Ang^2)')
+    proc_sec.add_argument('--pdf-mode', type=str, default='rpdf', choices=['rpdf', 'pdf', '1/rpdf'],
+                         help="Output mode for PDF transform in UED calculations: 'rpdf' (default), 'pdf', or '1/rpdf'.")
     
     # Output options
     out_sec = parser.add_argument_group("Output options")
