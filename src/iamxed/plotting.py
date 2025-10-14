@@ -58,7 +58,7 @@ def plot_static(q: np.ndarray, signal: np.ndarray, is_xrd: bool, pdf_mode: str, 
         title_pdf = f'Pair Distribution Function ({pdf_label})'
         label_pdf = f'{pdf_label} (arb. units)'
         title_i = f'{"XRD" if is_xrd else "UED"} Signal Intensity{" (inel.)" if inelastic else ""}'
-        label_i = f'{'$I(q)$' if is_xrd else '$I(s)$'} (arb. units)'
+        label_i = f'{"$I(q)$" if is_xrd else "$I(s)$"} (arb. units)'
 
     # initialize plot
     fig, axs = plt.subplots(1,2, figsize=(5*2, 5), gridspec_kw={'width_ratios': [1, 1]})
