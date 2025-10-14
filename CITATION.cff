@@ -1,4 +1,4 @@
-cff-version: 1.1.0
+cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
   - family-names: Suchan
@@ -11,3 +11,23 @@ title: "IAM-XED: Independent Atom Model for X-ray and Electron Diffraction"
 version: 1.1.0
 url: "https://github.com/blevine37/IAM-XED"
 date-released: 2025-10-14
+
+preferred-citation:
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: 'IAM-XED: Independent Atom Model for X-ray and Electron Diffraction'
+version: v1.1.0
+authors:
+  - family-names: Suchan
+    given-names: Jiří
+    orcid: https://orcid.org/0000-0003-0637-4022
+  - family-names: Janoš
+    given-names: Jiří
+    orcid: https://orcid.org/0000-0001-5903-8538
+date-released: '2025-10-14'
+doi: 10.5281/zenodo.17350829
+identifiers:
+license:
+- mit
+repository-code: https://github.com/blevine37/IAM-XED/tree/v1.1.0
